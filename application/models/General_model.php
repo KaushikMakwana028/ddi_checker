@@ -162,4 +162,74 @@ class General_model extends CI_Model
             ->get($table)
             ->row();
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Get Paginated Interaction Rules Joined with Drug Names
+    |--------------------------------------------------------------------------
+    */
+    public function getInteractions($limit = 25, $offset = 0, $search = '', $severity = '')
+    {
+        $this->db->select('i.*, da.drug_name AS drug_a_name, db.drug_name AS drug_b_name, u.name AS created_by_name');
+        $this->db->from('interactions i');
+        $this->db->join('drugs da', 'da.id = i.drug_a_id', 'left');
+        $this->db->join('drugs db', 'db.id = i.drug_b_id', 'left');
+        $this->db->join('users u', 'u.id = i.created_by', 'left');
+
+        if (!empty($search)) {
+            $this->db->group_start();
+            $this->db->like('da.drug_name', $search);
+            $this->db->or_like('db.drug_name', $search);
+            $this->db->or_like('i.remarks', $search);
+            $this->db->or_like('i.source', $search);
+            $this->db->group_end();
+        }
+
+        if (!empty($severity) && in_array($severity, ['Mild', 'Moderate', 'Severe'])) {
+            $this->db->where('i.severity', $severity);
+        }
+
+        $this->db->order_by('i.id', 'DESC');
+        $this->db->limit($limit, $offset);
+
+        return $this->db->get()->result_array();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Count Interaction Rules with Filters
+    |--------------------------------------------------------------------------
+    */
+    public function countInteractions($search = '', $severity = '')
+    {
+        $this->db->from('interactions i');
+        $this->db->join('drugs da', 'da.id = i.drug_a_id', 'left');
+        $this->db->join('drugs db', 'db.id = i.drug_b_id', 'left');
+
+        if (!empty($search)) {
+            $this->db->group_start();
+            $this->db->like('da.drug_name', $search);
+            $this->db->or_like('db.drug_name', $search);
+            $this->db->or_like('i.remarks', $search);
+            $this->db->or_like('i.source', $search);
+            $this->db->group_end();
+        }
+
+        if (!empty($severity) && in_array($severity, ['Mild', 'Moderate', 'Severe'])) {
+            $this->db->where('i.severity', $severity);
+        }
+
+        return $this->db->count_all_results();
+    }
+
+    public function getInteractionById($id)
+    {
+        $this->db->select('i.*, da.drug_name AS drug_a_name, db.drug_name AS drug_b_name');
+        $this->db->from('interactions i');
+        $this->db->join('drugs da', 'da.id = i.drug_a_id', 'left');
+        $this->db->join('drugs db', 'db.id = i.drug_b_id', 'left');
+        $this->db->where('i.id', $id);
+        return $this->db->get()->row_array();
+    }
 }
+
