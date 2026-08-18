@@ -29,12 +29,20 @@ class InteractionRules extends Admin_Controller {
         // Filtering parameters
         $search   = trim($this->input->get('search', TRUE) ?? '');
         $severity = trim($this->input->get('severity', TRUE) ?? '');
-        if (!in_array($severity, ['Mild', 'Moderate', 'Severe'])) {
+        if (!in_array($severity, ['Mild', 'Moderate', 'Severe', 'MAJOR', 'Not known interaction found'])) {
             $severity = '';
         }
 
         // Pagination parameters
-        $limit = 25;
+        $limit_param = $this->input->get('limit');
+        if ($limit_param === '-1') {
+            $limit = 999999;
+        } else {
+            $limit = (int)$limit_param;
+            if ($limit <= 0) {
+                $limit = 10; // default
+            }
+        }
         $page  = max(1, (int)$this->input->get('page'));
         $total_rows = $this->General_model->countInteractions($search, $severity);
         $total_pages = max(1, ceil($total_rows / $limit));
@@ -50,8 +58,10 @@ class InteractionRules extends Admin_Controller {
         $data['stats'] = [
             'total'     => $this->General_model->getCount('interactions'),
             'severe'    => $this->General_model->getCount('interactions', ['severity' => 'Severe']),
+            'major'     => $this->General_model->getCount('interactions', ['severity' => 'MAJOR']),
             'moderate'  => $this->General_model->getCount('interactions', ['severity' => 'Moderate']),
             'mild'      => $this->General_model->getCount('interactions', ['severity' => 'Mild']),
+            'not_known' => $this->General_model->getCount('interactions', ['severity' => 'Not known interaction found']),
             'active'    => $this->General_model->getCount('interactions', ['is_active' => 1])
         ];
 
@@ -106,7 +116,7 @@ class InteractionRules extends Admin_Controller {
 
         $this->form_validation->set_rules('drug_a_id', 'Drug A', 'required|integer');
         $this->form_validation->set_rules('drug_b_id', 'Drug B', 'required|integer');
-        $this->form_validation->set_rules('severity', 'Severity', 'required|in_list[Mild,Moderate,Severe]');
+        $this->form_validation->set_rules('severity', 'Severity', 'required|in_list[Mild,Moderate,Severe,MAJOR,Not known interaction found]');
         $this->form_validation->set_rules('remarks', 'Clinical Remarks', 'required|trim');
         $this->form_validation->set_rules('source', 'Clinical Source', 'trim|max_length[255]');
 
@@ -280,7 +290,7 @@ class InteractionRules extends Admin_Controller {
 
         $this->form_validation->set_rules('drug_a_id', 'Drug A', 'required|integer');
         $this->form_validation->set_rules('drug_b_id', 'Drug B', 'required|integer');
-        $this->form_validation->set_rules('severity', 'Severity', 'required|in_list[Mild,Moderate,Severe]');
+        $this->form_validation->set_rules('severity', 'Severity', 'required|in_list[Mild,Moderate,Severe,MAJOR,Not known interaction found]');
         $this->form_validation->set_rules('remarks', 'Clinical Remarks', 'required|trim');
         $this->form_validation->set_rules('source', 'Clinical Source', 'trim|max_length[255]');
 
@@ -649,15 +659,8 @@ class InteractionRules extends Admin_Controller {
             $drug_map[strtolower(trim($d['drug_name']))] = (int)$d['id'];
         }
 
-        $imported = 0;
-        $skipped  = 0;
-        $errors   = 0;
-        $error_log = [];
-        $seen_pairs = [];
-
-        $this->db->trans_begin();
-        $admin_id = $this->session->userdata('user_id');
-        $now = date('Y-m-d H:i:s');
+        $validation_errors = [];
+        $validated_rows = [];
 
         // Check if first row is header
         $startIdx = 0;
@@ -681,45 +684,84 @@ class InteractionRules extends Admin_Controller {
             $source      = trim($row[4] ?? '');
 
             if (empty($drug_a_name) || empty($drug_b_name)) {
-                $errors++;
-                $error_log[] = "Row {$row_number}: Drug A or Drug B name missing.";
+                $validation_errors[] = "Row {$row_number}: Drug A or Drug B name is missing.";
                 continue;
             }
 
             $key_a = strtolower($drug_a_name);
             $key_b = strtolower($drug_b_name);
 
+            $id_a = null;
+            $id_b = null;
+
             if (!isset($drug_map[$key_a])) {
-                $errors++;
-                $error_log[] = "Row {$row_number}: Drug '{$drug_a_name}' not found in drug registry.";
-                continue;
+                $validation_errors[] = "Row {$row_number}: Drug A '{$drug_a_name}' is not available in Drug Registry.";
+            } else {
+                $id_a = $drug_map[$key_a];
             }
+
             if (!isset($drug_map[$key_b])) {
-                $errors++;
-                $error_log[] = "Row {$row_number}: Drug '{$drug_b_name}' not found in drug registry.";
-                continue;
+                $validation_errors[] = "Row {$row_number}: Drug B '{$drug_b_name}' is not available in Drug Registry.";
+            } else {
+                $id_b = $drug_map[$key_b];
             }
 
-            $id_a = $drug_map[$key_a];
-            $id_b = $drug_map[$key_b];
-
-            if ($id_a === $id_b) {
-                $errors++;
-                $error_log[] = "Row {$row_number}: Drug A and Drug B are the same medicine ({$drug_a_name}).";
-                continue;
+            if ($id_a !== null && $id_b !== null) {
+                if ($id_a === $id_b) {
+                    $validation_errors[] = "Row {$row_number}: Drug A and Drug B cannot be the same medicine ('{$drug_a_name}').";
+                }
             }
 
-            // Normalization
+            if (empty($raw_severity)) {
+                $validation_errors[] = "Row {$row_number}: Severity level is missing.";
+            } else {
+                $resolved_severity = $this->resolveSeverity($raw_severity);
+                if ($resolved_severity === null) {
+                    $validation_errors[] = "Row {$row_number}: Severity level '{$raw_severity}' is not available.";
+                }
+            }
+
+            if (empty($validation_errors)) {
+                $validated_rows[] = [
+                    'id_a' => $id_a,
+                    'id_b' => $id_b,
+                    'severity' => isset($resolved_severity) ? $resolved_severity : null,
+                    'remarks' => $remarks,
+                    'source' => $source
+                ];
+            }
+        }
+
+        if (!empty($validation_errors)) {
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status'    => 'error',
+                'message'   => 'Import failed. Some rules could not be validated.',
+                'errors'    => $validation_errors,
+                'csrf_name' => $this->security->get_csrf_token_name(),
+                'csrf_hash' => $this->security->get_csrf_hash()
+            ]));
+            return;
+        }
+
+        // Pass 2: Execution (atomic database transactions)
+        $this->db->trans_begin();
+        $admin_id = $this->session->userdata('user_id');
+        $now = date('Y-m-d H:i:s');
+        $imported = 0;
+        $skipped  = 0;
+        $seen_pairs = [];
+
+        foreach ($validated_rows as $v_row) {
+            $id_a = $v_row['id_a'];
+            $id_b = $v_row['id_b'];
+            $severity = $v_row['severity'];
+            $remarks = $v_row['remarks'];
+            $source = $v_row['source'];
+
             if ($id_a > $id_b) {
                 $temp = $id_a;
                 $id_a = $id_b;
                 $id_b = $temp;
-            }
-
-            // Format severity
-            $severity = ucfirst(strtolower($raw_severity));
-            if (!in_array($severity, ['Mild', 'Moderate', 'Severe'])) {
-                $severity = 'Moderate';
             }
 
             $pair_key = "{$id_a}_{$id_b}";
@@ -766,16 +808,14 @@ class InteractionRules extends Admin_Controller {
             ]));
         } else {
             $this->db->trans_commit();
-            $msg = "Import completed: {$imported} rule(s) imported, {$skipped} duplicate pair(s) skipped, {$errors} error(s).";
+            $msg = "Import completed: {$imported} rule(s) imported, {$skipped} duplicate pair(s) skipped.";
             $this->output->set_content_type('application/json')->set_output(json_encode([
-                'status'        => 'success',
-                'message'       => $msg,
-                'imported'      => $imported,
-                'skipped'       => $skipped,
-                'errors'        => $errors,
-                'error_details' => array_slice($error_log, 0, 15),
-                'csrf_name'     => $this->security->get_csrf_token_name(),
-                'csrf_hash'     => $this->security->get_csrf_hash()
+                'status'    => 'success',
+                'message'   => $msg,
+                'imported'  => $imported,
+                'skipped'   => $skipped,
+                'csrf_name' => $this->security->get_csrf_token_name(),
+                'csrf_hash' => $this->security->get_csrf_hash()
             ]));
         }
     }
@@ -821,5 +861,62 @@ class InteractionRules extends Admin_Controller {
 
         fclose($output);
         exit;
+    }
+
+    /**
+     * Resolve and fuzzy-correct severity levels
+     */
+    private function resolveSeverity($raw) {
+        $s = strtolower(trim($raw));
+        if (empty($s)) return null;
+
+        // Exact match checks
+        $exact_map = [
+            'mild' => 'Mild',
+            'moderate' => 'Moderate',
+            'severe' => 'Severe',
+            'major' => 'MAJOR',
+            'not known interaction found' => 'Not known interaction found',
+            'not known interction found' => 'Not known interaction found',
+            'not known' => 'Not known interaction found',
+            'not_known' => 'Not known interaction found',
+            'unknown' => 'Not known interaction found'
+        ];
+        if (isset($exact_map[$s])) {
+            return $exact_map[$s];
+        }
+
+        // Substring match checks
+        if (strpos($s, 'severe') !== false || strpos($s, 'contraindicated') !== false) {
+            return 'Severe';
+        }
+        if (strpos($s, 'major') !== false) {
+            return 'MAJOR';
+        }
+        if (strpos($s, 'moderate') !== false || strpos($s, 'adjust') !== false || strpos($s, 'monitoring') !== false) {
+            return 'Moderate';
+        }
+        if (strpos($s, 'mild') !== false || strpos($s, 'minor') !== false || strpos($s, 'low risk') !== false) {
+            return 'Mild';
+        }
+        if (strpos($s, 'not known') !== false || strpos($s, 'unknown') !== false || strpos($s, 'no interaction') !== false) {
+            return 'Not known interaction found';
+        }
+
+        // Fuzzy matching for spelling mistakes
+        $candidates = ['Mild', 'Moderate', 'Severe', 'MAJOR', 'Not known interaction found'];
+        $best_match = null;
+        $shortest = -1;
+        foreach ($candidates as $candidate) {
+            $lev = levenshtein($s, strtolower($candidate));
+            if ($lev <= 2) {
+                if ($lev < $shortest || $shortest < 0) {
+                    $best_match = $candidate;
+                    $shortest = $lev;
+                }
+            }
+        }
+
+        return $best_match;
     }
 }

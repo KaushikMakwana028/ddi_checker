@@ -185,7 +185,7 @@ class General_model extends CI_Model
             $this->db->group_end();
         }
 
-        if (!empty($severity) && in_array($severity, ['Mild', 'Moderate', 'Severe'])) {
+        if (!empty($severity) && in_array($severity, ['Mild', 'Moderate', 'Severe', 'MAJOR', 'Not known interaction found'])) {
             $this->db->where('i.severity', $severity);
         }
 
@@ -215,7 +215,7 @@ class General_model extends CI_Model
             $this->db->group_end();
         }
 
-        if (!empty($severity) && in_array($severity, ['Mild', 'Moderate', 'Severe'])) {
+        if (!empty($severity) && in_array($severity, ['Mild', 'Moderate', 'Severe', 'MAJOR', 'Not known interaction found'])) {
             $this->db->where('i.severity', $severity);
         }
 
@@ -232,4 +232,3 @@ class General_model extends CI_Model
         return $this->db->get()->row_array();
     }
 }
-

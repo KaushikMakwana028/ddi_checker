@@ -136,7 +136,7 @@
                             </tr>
                         <?php else: ?>
                             <?php foreach ($recent_interactions as $row): ?>
-                                <?php $sev = strtolower($row['severity']); ?>
+                                <?php $sev = str_replace(' ', '-', strtolower($row['severity'])); ?>
                                 <tr>
                                     <td>
                                         <span class="drug-chip"><i class="bi bi-capsule"></i><?php echo html_escape($row['drug_a_name']); ?></span>
@@ -387,8 +387,10 @@
     }
 
     .sev-badge.sev-severe { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .sev-badge.sev-major { background: #fff5f5; color: #e03e3e; border: 1px solid #ffc9c9; }
     .sev-badge.sev-moderate { background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; }
     .sev-badge.sev-mild { background: #fefce8; color: #b45309; border: 1px solid #fde68a; }
+    .sev-badge.sev-not-known-interaction-found { background: #f8fafc; color: #64748b; border: 1px solid #cbd5e1; }
 
     .source-chip {
         display: inline-flex;

@@ -34,6 +34,13 @@
                 <span class="stat-value" id="statTotalRules"><?php echo number_format($stats['total'] ?? 0); ?></span>
             </div>
         </div>
+        <div class="stat-card stat-major">
+            <div class="stat-icon"><i class="bi bi-exclamation-diamond-fill"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">MAJOR</span>
+                <span class="stat-value" id="statMajorRules"><?php echo number_format($stats['major'] ?? 0); ?></span>
+            </div>
+        </div>
         <div class="stat-card stat-severe">
             <div class="stat-icon"><i class="bi bi-exclamation-octagon-fill"></i></div>
             <div class="stat-info">
@@ -55,6 +62,13 @@
                 <span class="stat-value" id="statMildRules"><?php echo number_format($stats['mild'] ?? 0); ?></span>
             </div>
         </div>
+        <div class="stat-card stat-notknown">
+            <div class="stat-icon"><i class="bi bi-question-circle-fill"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Not Known</span>
+                <span class="stat-value" id="statNotKnownRules"><?php echo number_format($stats['not_known'] ?? 0); ?></span>
+            </div>
+        </div>
     </div>
 
     <!-- MAIN PANEL -->
@@ -68,9 +82,21 @@
             <select name="severity" id="filterSeveritySelect" class="filter-select">
                 <option value="">All Severities</option>
                 <option value="Severe" <?php echo ($severity === 'Severe') ? 'selected' : ''; ?>>Severe</option>
+                <option value="MAJOR" <?php echo ($severity === 'MAJOR') ? 'selected' : ''; ?>>MAJOR</option>
                 <option value="Moderate" <?php echo ($severity === 'Moderate') ? 'selected' : ''; ?>>Moderate</option>
                 <option value="Mild" <?php echo ($severity === 'Mild') ? 'selected' : ''; ?>>Mild</option>
+                <option value="Not known interaction found" <?php echo ($severity === 'Not known interaction found') ? 'selected' : ''; ?>>Not known interaction found</option>
             </select>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-secondary fw-semibold" style="font-size: 13px;">Show</span>
+                <select id="pageSizeSelect" class="filter-select" style="width: 120px; height: 40px; border-radius: 10px; border-color: #cbd5e1; font-weight: 500; font-size: 13px; cursor: pointer; box-shadow: none;">
+                    <option value="10">10 rows</option>
+                    <option value="25">25 rows</option>
+                    <option value="50">50 rows</option>
+                    <option value="100">100 rows</option>
+                    <option value="-1">View All</option>
+                </select>
+            </div>
             <button type="button" id="clearFiltersBtn" class="filter-reset" title="Reset Filters">
                 <i class="bi bi-arrow-counterclockwise"></i> <span>Reset</span>
             </button>
@@ -112,7 +138,7 @@
                     <?php else: ?>
                         <?php foreach ($interactions as $rule): ?>
                             <?php
-                            $sevClass = strtolower($rule['severity']);
+                            $sevClass = str_replace(' ', '-', strtolower($rule['severity']));
                             $fullRemarks = $rule['remarks'] ?: 'No clinical remarks recorded.';
                             $pairLabel = $rule['drug_a_name'] . ' + ' . $rule['drug_b_name'];
                             ?>
@@ -262,7 +288,7 @@
                             <ul class="mb-0 mt-1.5 ps-3">
                                 <li>Supports standard <strong>.xlsx (Excel)</strong> and <strong>.csv</strong> files.</li>
                                 <li>Drug names are matched case-insensitively against active formulary.</li>
-                                <li>Allowed severities: <code>Mild</code>, <code>Moderate</code>, <code>Severe</code>.</li>
+                                <li>Allowed severities: <code>Mild</code>, <code>Moderate</code>, <code>Severe</code>, <code>MAJOR</code>, <code>Not known interaction found</code>.</li>
                                 <li>Existing duplicate pairs are safely skipped.</li>
                             </ul>
                         </div>
@@ -400,7 +426,7 @@
     /* Stat Cards */
     .ddi-stats {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(6, 1fr);
         gap: 16px;
         margin-bottom: 24px;
     }
@@ -427,9 +453,11 @@
     }
 
     .stat-total .stat-icon { background: #f0fdfa; color: #0f766e; }
+    .stat-major .stat-icon { background: #faf5ff; color: #7e22ce; }
     .stat-severe .stat-icon { background: #fef2f2; color: #dc2626; }
     .stat-moderate .stat-icon { background: #fffbeb; color: #d97706; }
     .stat-mild .stat-icon { background: #eff6ff; color: #2563eb; }
+    .stat-notknown .stat-icon { background: #f1f5f9; color: #475569; }
 
     .stat-info { display: flex; flex-direction: column; }
     .stat-label { font-size: 12px; font-weight: 500; color: #64748b; margin-bottom: 2px; }
@@ -583,8 +611,10 @@
         white-space: nowrap;
     }
     .sev-severe { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .sev-major { background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; }
     .sev-moderate { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
     .sev-mild { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .sev-not-known-interaction-found { background: #f8fafc; color: #64748b; border: 1px solid #cbd5e1; }
 
     .remarks-text { color: #475569; font-size: 13px; line-height: 1.45; }
     .link-btn { background: none; border: none; padding: 0; color: #0f766e; font-weight: 600; font-size: 12.5px; cursor: pointer; text-decoration: underline; }
@@ -718,8 +748,16 @@
         flex-shrink: 0;
     }
 
-    @media (max-width: 991px) {
+    @media (max-width: 1200px) {
+        .ddi-stats { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 768px) {
         .ddi-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 480px) {
+        .ddi-stats { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 767px) {
@@ -767,10 +805,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', function() {
+            fetchRules(1);
+        });
+    }
+
     if (clearFiltersBtn) {
         clearFiltersBtn.addEventListener('click', function() {
             if (filterSearchInput) filterSearchInput.value = '';
             if (filterSeveritySelect) filterSeveritySelect.value = '';
+            if (pageSizeSelect) pageSizeSelect.value = '10';
             fetchRules(1);
         });
     }
@@ -789,10 +835,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (filterLoading) filterLoading.classList.add('active');
         const search = filterSearchInput ? filterSearchInput.value.trim() : '';
         const severity = filterSeveritySelect ? filterSeveritySelect.value : '';
+        const pageSizeSelect = document.getElementById('pageSizeSelect');
+        const limit = pageSizeSelect ? pageSizeSelect.value : '10';
 
         const url = new URL('<?php echo base_url("admin/interactions"); ?>');
         url.searchParams.set('ajax', '1');
         url.searchParams.set('page', page);
+        url.searchParams.set('limit', limit);
         if (search) url.searchParams.set('search', search);
         if (severity) url.searchParams.set('severity', severity);
 
@@ -835,7 +884,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let html = '';
         rules.forEach(rule => {
-            const sevClass = (rule.severity || '').toLowerCase();
+            const sevClass = (rule.severity || '').toLowerCase().replace(/\s+/g, '-');
             const fullRemarks = rule.remarks || 'No clinical remarks recorded.';
             const pairLabel = (rule.drug_a_name || 'Drug A') + ' + ' + (rule.drug_b_name || 'Drug B');
 
@@ -887,19 +936,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 pagHtml += `<nav class="ddi-pagination">`;
                 pagHtml += `<a href="#" class="page-nav-btn ${currentPage <= 1 ? 'disabled' : ''}" data-page="${currentPage - 1}"><i class="bi bi-chevron-left"></i></a>`;
                 
-                const startP = Math.max(1, currentPage - 2);
-                const endP = Math.min(totalPages, currentPage + 2);
-                if (startP > 1) {
-                    pagHtml += `<a href="#" class="page-num-btn" data-page="1">1</a>`;
-                    if (startP > 2) pagHtml += `<span class="page-ellipsis">…</span>`;
+                let pages = [];
+                if (totalPages <= 5) {
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                    if (currentPage <= 3) {
+                        pages.push(1, 2, 3, '...', totalPages);
+                    } else if (currentPage >= totalPages - 2) {
+                        pages.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
+                    } else {
+                        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+                    }
                 }
-                for (let i = startP; i <= endP; i++) {
-                    pagHtml += `<a href="#" class="page-num-btn ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</a>`;
-                }
-                if (endP < totalPages) {
-                    if (endP < totalPages - 1) pagHtml += `<span class="page-ellipsis">…</span>`;
-                    pagHtml += `<a href="#" class="page-num-btn" data-page="${totalPages}">${totalPages}</a>`;
-                }
+
+                pages.forEach(p => {
+                    if (p === '...') {
+                        pagHtml += `<span class="page-ellipsis">…</span>`;
+                    } else {
+                        pagHtml += `<a href="#" class="page-num-btn ${p === currentPage ? 'active' : ''}" data-page="${p}">${p}</a>`;
+                    }
+                });
+                
                 pagHtml += `<a href="#" class="page-nav-btn ${currentPage >= totalPages ? 'disabled' : ''}" data-page="${currentPage + 1}"><i class="bi bi-chevron-right"></i></a>`;
                 pagHtml += `</nav>`;
             }
@@ -911,9 +968,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateStats(stats) {
         if (!stats) return;
         if (document.getElementById('statTotalRules')) document.getElementById('statTotalRules').textContent = stats.total || 0;
+        if (document.getElementById('statMajorRules')) document.getElementById('statMajorRules').textContent = stats.major || 0;
         if (document.getElementById('statSevereRules')) document.getElementById('statSevereRules').textContent = stats.severe || 0;
         if (document.getElementById('statModerateRules')) document.getElementById('statModerateRules').textContent = stats.moderate || 0;
         if (document.getElementById('statMildRules')) document.getElementById('statMildRules').textContent = stats.mild || 0;
+        if (document.getElementById('statNotKnownRules')) document.getElementById('statNotKnownRules').textContent = stats.not_known || 0;
     }
 
     // 2. Table Action Handlers
@@ -1086,7 +1145,126 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     fetchRules(1);
                 } else {
-                    showAlert('error', data.message);
+                    if (data.errors && data.errors.length > 0) {
+                        const allErrors = data.errors;
+                        
+                        // Custom premium header layout + search bar + container
+                        let html = `
+                        <div class="ddi-import-error-modal text-start" style="font-family: 'Poppins', sans-serif;">
+                            <!-- Header Warning Card -->
+                            <div class="d-flex align-items-center gap-3 p-3 mb-3 border-0" style="background-color: #fff5f5; border-left: 4px solid #fa5252 !important; border-radius: 12px;">
+                                <div style="background-color: #ffe3e3; color: #e03131; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(224, 49, 49, 0.15);">
+                                    <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                                </div>
+                                <div style="flex-grow: 1;">
+                                    <h5 class="fw-bold mb-0.5" style="color: #c92a2a; font-size: 15px; margin: 0;">Import Blocked (${allErrors.length} Errors)</h5>
+                                    <p class="mb-0 text-muted" style="font-size: 12px; line-height: 1.4; font-weight: 500;">No changes were saved. Please resolve the issues below.</p>
+                                </div>
+                            </div>
+
+                            <!-- Search Filter Input -->
+                            <div class="mb-3">
+                                <div class="input-group" style="box-shadow: none;">
+                                    <span class="input-group-text bg-white border-end-0" style="border-color: #e2e8f0; border-top-left-radius: 8px; border-bottom-left-radius: 8px; padding: 6px 12px;"><i class="bi bi-funnel text-muted fs-6"></i></span>
+                                    <input type="text" id="swalErrorFilter" class="form-control border-start-0" placeholder="Type to filter errors by row or drug name..." style="border-color: #e2e8f0; border-top-right-radius: 8px; border-bottom-right-radius: 8px; outline: none; box-shadow: none; font-size: 13px; padding: 6px 12px;" autocomplete="off">
+                                </div>
+                                <div class="d-flex justify-content-end align-items-center mt-2 px-1">
+                                    <span id="swalErrorCountText" class="badge px-2.5 py-1.5 rounded-pill" style="font-size: 11px; font-weight: 600; background-color: #f8fafc; border: 1px solid #e2e8f0; color: #64748b !important;">Showing ${Math.min(allErrors.length, 100)} of ${allErrors.length} errors</span>
+                                </div>
+                            </div>
+
+                            <!-- Scrollable Error List Container -->
+                            <div style="max-height: 260px; overflow-y: auto; padding-right: 4px;" class="swal-errors-scroll">
+                                <div class="d-flex flex-column gap-2" id="swalErrorListContainer" style="display: flex; flex-direction: column; gap: 8px;">
+                                    <!-- Dynamic elements will be rendered here for high performance -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <style>
+                            .swal-errors-scroll::-webkit-scrollbar { width: 5px; }
+                            .swal-errors-scroll::-webkit-scrollbar-track { background: #f8fafc; border-radius: 999px; }
+                            .swal-errors-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 999px; }
+                            .swal-errors-scroll::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+                        </style>
+                        `;
+
+                        Swal.fire({
+                            title: '', // Custom header is built into html for spacing control
+                            html: html,
+                            showConfirmButton: true,
+                            confirmButtonColor: '#0f766e',
+                            confirmButtonText: 'Dismiss',
+                            customClass: {
+                                popup: 'rounded-4 border-0 shadow-lg p-3.5',
+                                htmlContainer: 'm-0'
+                            },
+                            width: window.innerWidth < 576 ? '95%' : '560px',
+                            didOpen: () => {
+                                const container = document.getElementById('swalErrorListContainer');
+                                const countLabel = document.getElementById('swalErrorCountText');
+                                const filterInput = document.getElementById('swalErrorFilter');
+
+                                function renderSwalErrors(filterText = '') {
+                                    const val = filterText.toLowerCase().trim();
+                                    
+                                    // Match filter terms
+                                    const filtered = allErrors.filter(err => err.toLowerCase().includes(val));
+                                    
+                                    // Render only first 100 to prevent mobile DOM latency
+                                    const limit = 100;
+                                    const visibleList = filtered.slice(0, limit);
+                                    
+                                    let itemsHtml = '';
+                                    visibleList.forEach(err => {
+                                        let displayContent = escapeHtml(err);
+                                        let match = err.match(/^Row (\d+):\s*(.*)$/);
+                                        if (match) {
+                                            let rowNum = match[1];
+                                            let msg = match[2];
+                                            displayContent = `<span class="badge me-2" style="background-color: #fee2e2; color: #e03131; border: 1px solid #ffc9c9; font-weight: 700; font-size: 10px; padding: 3px 6px; border-radius: 4px; flex-shrink: 0; min-width: 50px; text-align: center;">Row ${rowNum}</span> <span style="font-weight: 500; font-size: 12px; line-height: 1.4; color: #495057; text-align: left; word-break: break-word;">${escapeHtml(msg)}</span>`;
+                                        } else {
+                                            displayContent = `<span style="font-weight: 500; font-size: 12px; line-height: 1.4; color: #495057; text-align: left; word-break: break-word;">${displayContent}</span>`;
+                                        }
+                                        itemsHtml += `<div class="d-flex align-items-center py-2 px-2.5 rounded-3" style="background-color: #fff5f5; color: #c92a2a; border-left: 3.5px solid #fa5252 !important; box-shadow: 0 1px 2px rgba(0,0,0,0.01); text-align: left; display: flex !important;">
+                                            ${displayContent}
+                                        </div>`;
+                                    });
+
+                                    if (filtered.length > limit) {
+                                        itemsHtml += `<div class="text-center py-2 text-muted small fw-medium" style="background: #f8fafc; border-radius: 8px; border: 1px dashed #e2e8f0; font-size: 11px; margin-top: 4px;">
+                                            <i class="bi bi-info-circle me-1"></i> Showing first 100 of ${filtered.length} matching errors. Refine search.
+                                        </div>`;
+                                    }
+
+                                    if (filtered.length === 0) {
+                                        itemsHtml = `<div class="text-center py-5 text-muted border" style="background: #f8fafc; border-style: dashed !important; border-radius: 8px; font-size: 13px;">
+                                            <i class="bi bi-search fs-4 d-block mb-2 text-secondary opacity-50"></i>
+                                            No matching errors found
+                                        </div>`;
+                                    }
+
+                                    container.innerHTML = itemsHtml;
+                                    if (countLabel) {
+                                        countLabel.textContent = `Showing ${filtered.length} of ${allErrors.length} errors`;
+                                    }
+                                }
+
+                                // Initial load
+                                renderSwalErrors();
+
+                                // Setup event listener
+                                if (filterInput) {
+                                    filterInput.focus();
+                                    filterInput.addEventListener('input', function(e) {
+                                        renderSwalErrors(e.target.value);
+                                    });
+                                }
+                            }
+                        });
+                    } else {
+                        showAlert('error', data.message || 'An error occurred during CSV import.');
+                    }
                 }
             })
             .catch(error => {

@@ -97,8 +97,10 @@
                             <select id="severity" name="severity" required>
                                 <option value="">Select Severity Level...</option>
                                 <option value="Severe" <?php echo set_select('severity', 'Severe'); ?>>Severe (Contraindicated / Major Risk)</option>
+                                <option value="MAJOR" <?php echo set_select('severity', 'MAJOR'); ?>>MAJOR</option>
                                 <option value="Moderate" <?php echo set_select('severity', 'Moderate', TRUE); ?>>Moderate (Adjust Dose / Close Monitoring)</option>
                                 <option value="Mild" <?php echo set_select('severity', 'Mild'); ?>>Mild (Minor Significance / Low Risk)</option>
+                                <option value="Not known interaction found" <?php echo set_select('severity', 'Not known interaction found'); ?>>Not known interaction found</option>
                             </select>
                             <span class="field-hint">Clinical risk classification tier.</span>
                         </div>

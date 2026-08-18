@@ -395,4 +395,275 @@ class DrugEntry extends Admin_Controller {
             ]));
         }
     }
+
+    /**
+     * Download Sample CSV for Drugs
+     */
+    public function sample_csv() {
+        $filename = 'drugs_import_sample.csv';
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        $output = fopen('php://output', 'w');
+
+        // Write Header
+        fputcsv($output, ['Drug Name', 'Synonyms', 'Category', 'Quantity', 'Unit']);
+
+        // Write Sample Rows
+        fputcsv($output, ['Aspirin', 'acetylsalicylic acid, ASA', 'Analgesics', '150', 'tablets']);
+        fputcsv($output, ['Warfarin', 'Coumadin, Jantoven', 'Anticoagulants', '80', 'mg']);
+        fputcsv($output, ['Ibuprofen', 'Advil, Motrin', 'NSAIDs', '200', 'tablets']);
+
+        fclose($output);
+        exit;
+    }
+
+    /**
+     * Export Drugs to CSV
+     */
+    public function export() {
+        $sql = "SELECT drug_name, synonyms, category, quantity, unit,
+                       IF(is_active = 1, 'Active', 'Inactive') AS status,
+                       created_at
+                FROM drugs
+                ORDER BY id ASC";
+
+        $drugs = $this->General_model->query($sql);
+
+        $filename = 'drug_registry_export_' . date('Y-m-d_His') . '.csv';
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        $output = fopen('php://output', 'w');
+
+        // Write CSV Header
+        fputcsv($output, ['Drug Name', 'Synonyms', 'Category', 'Quantity', 'Unit', 'Status', 'Date Added']);
+
+        foreach ($drugs as $row) {
+            fputcsv($output, [
+                $row['drug_name'],
+                $row['synonyms'] ?? '',
+                $row['category'] ?? '',
+                $row['quantity'],
+                $row['unit'] ?? '',
+                $row['status'],
+                $row['created_at']
+            ]);
+        }
+
+        fclose($output);
+        exit;
+    }
+
+    /**
+     * Bulk Import Drugs (Excel / CSV)
+     */
+    public function import() {
+        if ($this->input->method() !== 'post') {
+            show_error('Method not allowed', 405);
+        }
+
+        if (empty($_FILES['csv_file']['name']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status'    => 'error',
+                'message'   => 'Please choose a valid Excel (.xlsx) or CSV file to upload.',
+                'csrf_name' => $this->security->get_csrf_token_name(),
+                'csrf_hash' => $this->security->get_csrf_hash()
+            ]));
+            return;
+        }
+
+        // Validate file extension
+        $file_name = $_FILES['csv_file']['name'];
+        $ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['csv', 'xlsx'])) {
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status'    => 'error',
+                'message'   => 'Invalid file format. Only Excel (.xlsx) and CSV (.csv) files are supported.',
+                'csrf_name' => $this->security->get_csrf_token_name(),
+                'csrf_hash' => $this->security->get_csrf_hash()
+            ]));
+            return;
+        }
+
+        $tmp_file = $_FILES['csv_file']['tmp_name'];
+        $rows = [];
+
+        if ($ext === 'csv') {
+            $handle = fopen($tmp_file, 'r');
+            if (!$handle) {
+                $this->output->set_content_type('application/json')->set_output(json_encode([
+                    'status'    => 'error',
+                    'message'   => 'Unable to read the uploaded CSV file.',
+                    'csrf_name' => $this->security->get_csrf_token_name(),
+                    'csrf_hash' => $this->security->get_csrf_hash()
+                ]));
+                return;
+            }
+            while (($r = fgetcsv($handle, 2048, ',')) !== FALSE) {
+                $rows[] = $r;
+            }
+            fclose($handle);
+        } else {
+            // Excel XLSX parsing
+            require_once APPPATH . 'libraries/SimpleXLSXReader.php';
+            $rows = SimpleXLSXReader::parse($tmp_file);
+            if ($rows === false) {
+                $this->output->set_content_type('application/json')->set_output(json_encode([
+                    'status'    => 'error',
+                    'message'   => 'Unable to parse the uploaded Excel file. Please ensure it is a standard .xlsx workbook.',
+                    'csrf_name' => $this->security->get_csrf_token_name(),
+                    'csrf_hash' => $this->security->get_csrf_hash()
+                ]));
+                return;
+            }
+        }
+
+        if (empty($rows)) {
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status'    => 'error',
+                'message'   => 'The uploaded file contains no data rows.',
+                'csrf_name' => $this->security->get_csrf_token_name(),
+                'csrf_hash' => $this->security->get_csrf_hash()
+            ]));
+            return;
+        }
+
+        // Preload existing drugs case-insensitively to avoid duplicates
+        $all_drugs = $this->db->select('drug_name')->get('drugs')->result_array();
+        $existing_names = [];
+        foreach ($all_drugs as $d) {
+            $existing_names[strtolower(trim($d['drug_name']))] = true;
+        }
+
+        $validation_errors = [];
+        $validated_rows = [];
+        $seen_in_csv = [];
+
+        // Check if first row is header
+        $startIdx = 0;
+        $firstRowCol0 = strtolower(trim($rows[0][0] ?? ''));
+        if (strpos($firstRowCol0, 'drug') !== false || strpos($firstRowCol0, 'name') !== false) {
+            $startIdx = 1; // skip header row
+        }
+
+        for ($i = $startIdx; $i < count($rows); $i++) {
+            $row = $rows[$i];
+            $row_number = $i + 1;
+
+            if (empty(array_filter($row, 'strlen'))) {
+                continue;
+            }
+
+            $drug_name = trim($row[0] ?? '');
+            $synonyms  = trim($row[1] ?? '');
+            $category  = trim($row[2] ?? '');
+            $quantity  = trim($row[3] ?? '');
+            $unit      = trim($row[4] ?? '');
+
+            if (empty($drug_name)) {
+                $validation_errors[] = "Row {$row_number}: Drug name is missing.";
+                continue;
+            }
+
+            if (strlen($drug_name) < 2) {
+                $validation_errors[] = "Row {$row_number}: Drug name must be at least 2 characters long.";
+            }
+
+            if ($quantity === '') {
+                $validation_errors[] = "Row {$row_number}: Quantity is missing.";
+            } elseif (!is_numeric($quantity) || intval($quantity) != $quantity || intval($quantity) < 0) {
+                $validation_errors[] = "Row {$row_number}: Quantity must be a non-negative integer (got '{$quantity}').";
+            }
+
+            $key = strtolower($drug_name);
+            if (isset($seen_in_csv[$key])) {
+                // If it's a duplicate name in the CSV itself, skip it, or log it
+            } else {
+                $seen_in_csv[$key] = true;
+            }
+
+            if (empty($validation_errors)) {
+                $validated_rows[] = [
+                    'drug_name' => $drug_name,
+                    'synonyms' => !empty($synonyms) ? $synonyms : null,
+                    'category' => !empty($category) ? $category : null,
+                    'quantity' => intval($quantity),
+                    'unit' => !empty($unit) ? $unit : null
+                ];
+            }
+        }
+
+        if (!empty($validation_errors)) {
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status'    => 'error',
+                'message'   => 'Import failed. Some rows could not be validated.',
+                'errors'    => $validation_errors,
+                'csrf_name' => $this->security->get_csrf_token_name(),
+                'csrf_hash' => $this->security->get_csrf_hash()
+            ]));
+            return;
+        }
+
+        // Pass 2: Execution (atomic database transactions)
+        $this->db->trans_begin();
+        $admin_id = $this->session->userdata('user_id');
+        $now = date('Y-m-d H:i:s');
+        $imported = 0;
+        $skipped  = 0;
+        $seen_inserted = [];
+
+        foreach ($validated_rows as $v_row) {
+            $drug_name = $v_row['drug_name'];
+            $key = strtolower($drug_name);
+
+            if (isset($existing_names[$key]) || isset($seen_inserted[$key])) {
+                $skipped++;
+                continue;
+            }
+
+            $insert_data = [
+                'drug_name'  => $drug_name,
+                'synonyms'   => $v_row['synonyms'],
+                'category'   => $v_row['category'],
+                'quantity'   => $v_row['quantity'],
+                'unit'       => $v_row['unit'],
+                'is_active'  => 1,
+                'created_by' => $admin_id,
+                'created_at' => $now,
+                'updated_at' => $now
+            ];
+
+            $this->General_model->insert('drugs', $insert_data);
+            $seen_inserted[$key] = true;
+            $imported++;
+        }
+
+        if ($this->db->trans_status() === FALSE) {
+            $this->db->trans_rollback();
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status'    => 'error',
+                'message'   => 'Database error encountered during bulk import. Changes reverted.',
+                'csrf_name' => $this->security->get_csrf_token_name(),
+                'csrf_hash' => $this->security->get_csrf_hash()
+            ]));
+        } else {
+            $this->db->trans_commit();
+            $msg = "Import completed: {$imported} drug(s) imported, {$skipped} duplicate(s) skipped.";
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status'    => 'success',
+                'message'   => $msg,
+                'imported'  => $imported,
+                'skipped'   => $skipped,
+                'csrf_name' => $this->security->get_csrf_token_name(),
+                'csrf_hash' => $this->security->get_csrf_hash()
+            ]));
+        }
+    }
 }

@@ -1,5 +1,32 @@
-<?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
+<?php 
+defined('BASEPATH') or exit('No direct script access allowed'); 
 
+// Compute Doctor Statistics
+$total_doctors = count($doctors);
+$active_doctors = 0;
+$inactive_doctors = 0;
+
+$specs = [];
+$hospitals = [];
+
+foreach ($doctors as $doc) {
+    if (isset($doc['is_active']) && $doc['is_active'] == 1) {
+        $active_doctors++;
+    } else {
+        $inactive_doctors++;
+    }
+    
+    if (!empty($doc['specialization'])) {
+        $specs[] = trim(strtolower($doc['specialization']));
+    }
+    if (!empty($doc['hospital_clinic'])) {
+        $hospitals[] = trim(strtolower($doc['hospital_clinic']));
+    }
+}
+
+$unique_specs = count(array_unique($specs));
+$unique_hospitals = count(array_unique($hospitals));
+?>
 <!-- SweetAlert2 CSS & JS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -21,6 +48,45 @@
         </div>
     </div>
 
+    <!-- STAT CARDS -->
+    <div class="ddi-stats mb-4">
+        <div class="stat-card stat-total">
+            <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Total Doctors</span>
+                <span class="stat-value"><?php echo number_format($total_doctors); ?></span>
+            </div>
+        </div>
+        <div class="stat-card stat-active">
+            <div class="stat-icon"><i class="bi bi-check-circle-fill"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Active</span>
+                <span class="stat-value"><?php echo number_format($active_doctors); ?></span>
+            </div>
+        </div>
+        <div class="stat-card stat-inactive">
+            <div class="stat-icon"><i class="bi bi-pause-circle-fill"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Inactive</span>
+                <span class="stat-value"><?php echo number_format($inactive_doctors); ?></span>
+            </div>
+        </div>
+        <div class="stat-card stat-spec">
+            <div class="stat-icon"><i class="bi bi-bookmark-star-fill"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Specializations</span>
+                <span class="stat-value"><?php echo number_format($unique_specs); ?></span>
+            </div>
+        </div>
+        <div class="stat-card stat-hosp">
+            <div class="stat-icon"><i class="bi bi-building-fill"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Hospitals</span>
+                <span class="stat-value"><?php echo number_format($unique_hospitals); ?></span>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Panel & Searchable Doctors Table -->
     <div class="panel-card">
         <!-- Filter Bar -->
@@ -29,6 +95,18 @@
                 <i class="bi bi-search"></i>
                 <input type="text" id="doctorSearchInput" placeholder="Search by doctor name, email, specialization, or license #..." autocomplete="off">
             </div>
+            
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-secondary fw-semibold" style="font-size: 13px;">Show</span>
+                <select id="pageSizeSelect" class="form-select form-select-sm" style="width: 120px; height: 40px; border-radius: 10px; border-color: #cbd5e1; font-weight: 500; font-size: 13px; cursor: pointer; box-shadow: none;">
+                    <option value="10">10 rows</option>
+                    <option value="25">25 rows</option>
+                    <option value="50">50 rows</option>
+                    <option value="100">100 rows</option>
+                    <option value="-1">View All</option>
+                </select>
+            </div>
+
             <button type="button" id="clearDoctorSearchBtn" class="filter-reset-btn" title="Reset Search">
                 <i class="bi bi-arrow-counterclockwise"></i> <span>Reset</span>
             </button>
@@ -137,6 +215,8 @@
                 </tbody>
             </table>
         </div>
+        <!-- Pagination Wrapper -->
+        <div id="paginationWrapper"></div>
     </div>
 </div>
 
@@ -146,6 +226,45 @@
         font-family: 'Poppins', sans-serif;
         box-sizing: border-box;
     }
+
+    /* Stat Cards */
+    .ddi-stats {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 18px 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .stat-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+
+    .stat-total .stat-icon { background: #f0fdfa; color: #0f766e; }
+    .stat-active .stat-icon { background: #f0fdf4; color: #16a34a; }
+    .stat-inactive .stat-icon { background: #fffbeb; color: #d97706; }
+    .stat-spec .stat-icon { background: #eff6ff; color: #2563eb; }
+    .stat-hosp .stat-icon { background: #fdf4ff; color: #c026d3; }
+
+    .stat-info { display: flex; flex-direction: column; }
+    .stat-label { font-size: 12px; font-weight: 500; color: #64748b; margin-bottom: 2px; }
+    .stat-value { font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.1; }
 
     .page-header {
         display: flex;
@@ -457,6 +576,18 @@
         margin-right: auto;
     }
 
+    @media (max-width: 1200px) {
+        .ddi-stats { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+        .ddi-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 480px) {
+        .ddi-stats { grid-template-columns: 1fr; }
+    }
+
     @media (max-width: 767px) {
         .page-header {
             flex-direction: column;
@@ -493,6 +624,47 @@
             justify-content: center;
         }
     }
+
+    /* Footer Pagination */
+    .ddi-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        border-top: 1px solid #e2e8f0;
+        background: #fbfcfe;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .footer-count { font-size: 13px; color: #64748b; }
+    .footer-count strong { color: #0f172a; }
+
+    .ddi-pagination {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .page-nav-btn, .page-num-btn {
+        min-width: 32px;
+        height: 32px;
+        padding: 0 8px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        color: #475569;
+        font-size: 13px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        transition: all .15s ease;
+    }
+    .page-num-btn.active { background: #0f766e; border-color: #0f766e; color: #ffffff; font-weight: 600; }
+    .page-nav-btn.disabled { opacity: .4; pointer-events: none; }
+    .page-ellipsis { padding: 0 4px; color: #94a3b8; font-size: 13px; }
 </style>
 
 <script>
@@ -512,10 +684,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const doctorSearchInput = document.getElementById('doctorSearchInput');
     const clearDoctorSearchBtn = document.getElementById('clearDoctorSearchBtn');
 
-    // 1. Filter Table Search
+    // 1. Client-Side Live Search Filtering & Pagination
+    let currentPage = 1;
+
     if (doctorSearchInput) {
         doctorSearchInput.addEventListener('keyup', function() {
-            filterDoctors();
+            currentPage = 1;
+            paginateDoctors();
+        });
+    }
+
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', function() {
+            currentPage = 1;
+            paginateDoctors();
         });
     }
 
@@ -523,16 +706,22 @@ document.addEventListener('DOMContentLoaded', function() {
         clearDoctorSearchBtn.addEventListener('click', function() {
             if (doctorSearchInput) {
                 doctorSearchInput.value = '';
-                filterDoctors();
+                if (pageSizeSelect) pageSizeSelect.value = '10';
+                currentPage = 1;
+                paginateDoctors();
             }
         });
     }
 
-    function filterDoctors() {
+    function paginateDoctors() {
         const query = doctorSearchInput ? doctorSearchInput.value.toLowerCase().trim() : '';
         const rows = document.querySelectorAll('#doctorsTableBody tr.doctor-row');
         
-        let visibleCount = 0;
+        const pageSizeSelect = document.getElementById('pageSizeSelect');
+        const selectedLimit = pageSizeSelect ? parseInt(pageSizeSelect.value) : 10;
+        const currentLimit = selectedLimit === -1 ? rows.length : selectedLimit;
+
+        const matchedRows = [];
         rows.forEach(row => {
             const name = row.querySelector('.doctor-name-cell') ? row.querySelector('.doctor-name-cell').textContent.toLowerCase() : '';
             const email = row.querySelector('.doctor-email-cell') ? row.querySelector('.doctor-email-cell').textContent.toLowerCase() : '';
@@ -541,15 +730,31 @@ document.addEventListener('DOMContentLoaded', function() {
             const reg = row.querySelector('.doctor-reg-cell') ? row.querySelector('.doctor-reg-cell').textContent.toLowerCase() : '';
             
             if (name.includes(query) || email.includes(query) || spec.includes(query) || hosp.includes(query) || reg.includes(query)) {
+                matchedRows.push(row);
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        const totalRows = matchedRows.length;
+        const totalPages = Math.ceil(totalRows / currentLimit);
+        
+        if (currentPage < 1) currentPage = 1;
+        if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+
+        const startIndex = (currentPage - 1) * currentLimit;
+        const endIndex = startIndex + currentLimit;
+
+        matchedRows.forEach((row, idx) => {
+            if (idx >= startIndex && idx < endIndex) {
                 row.style.display = '';
-                visibleCount++;
             } else {
                 row.style.display = 'none';
             }
         });
 
         const existingNoResults = document.getElementById('noResultsDoctorRow');
-        if (visibleCount === 0 && rows.length > 0) {
+        if (totalRows === 0 && rows.length > 0) {
             if (!existingNoResults) {
                 const noResults = document.createElement('tr');
                 noResults.id = 'noResultsDoctorRow';
@@ -571,6 +776,67 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (existingNoResults) {
             existingNoResults.style.display = 'none';
         }
+
+        // Render pagination footer inside paginationWrapper
+        const pagWrap = document.getElementById('paginationWrapper');
+        if (!pagWrap) return;
+
+        if (totalRows === 0) {
+            pagWrap.innerHTML = '';
+            return;
+        }
+
+        const showingTo = Math.min(startIndex + currentLimit, totalRows);
+        let pagHtml = `
+            <div class="ddi-footer">
+                <div class="footer-count">
+                    Showing <strong>${totalRows > 0 ? startIndex + 1 : 0}</strong>–<strong>${showingTo}</strong> of <strong>${totalRows}</strong> practitioners
+                </div>
+        `;
+
+        if (totalPages > 1) {
+            pagHtml += `<nav class="ddi-pagination">`;
+            pagHtml += `<a href="#" class="page-nav-btn ${currentPage <= 1 ? 'disabled' : ''}" data-page="${currentPage - 1}"><i class="bi bi-chevron-left"></i></a>`;
+
+            let pages = [];
+            if (totalPages <= 5) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+            } else {
+                if (currentPage <= 3) {
+                    pages.push(1, 2, 3, '...', totalPages);
+                } else if (currentPage >= totalPages - 2) {
+                    pages.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
+                } else {
+                    pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+                }
+            }
+
+            pages.forEach(p => {
+                if (p === '...') {
+                    pagHtml += `<span class="page-ellipsis">…</span>`;
+                } else {
+                    pagHtml += `<a href="#" class="page-num-btn ${p === currentPage ? 'active' : ''}" data-page="${p}">${p}</a>`;
+                }
+            });
+
+            pagHtml += `<a href="#" class="page-nav-btn ${currentPage >= totalPages ? 'disabled' : ''}" data-page="${currentPage + 1}"><i class="bi bi-chevron-right"></i></a>`;
+            pagHtml += `</nav>`;
+        }
+
+        pagHtml += `</div>`;
+        pagWrap.innerHTML = pagHtml;
+    }
+
+    // Setup page navigation listener
+    const paginationWrapper = document.getElementById('paginationWrapper');
+    if (paginationWrapper) {
+        paginationWrapper.addEventListener('click', function(e) {
+            const btn = e.target.closest('a');
+            if (!btn || btn.classList.contains('disabled') || !btn.dataset.page) return;
+            e.preventDefault();
+            currentPage = parseInt(btn.dataset.page);
+            paginateDoctors();
+        });
     }
 
     // 2. Delegate Actions (Deactivate, Activate)
@@ -673,9 +939,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const newTableBody = doc.getElementById('doctorsTableBody');
                 if (newTableBody && doctorsTableBody) {
                     doctorsTableBody.innerHTML = newTableBody.innerHTML;
-                    if (doctorSearchInput && doctorSearchInput.value !== '') {
-                        filterDoctors();
-                    }
+                    paginateDoctors();
                 }
             })
             .catch(error => {
@@ -722,5 +986,8 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
     }
+
+    // Trigger initial pagination
+    paginateDoctors();
 });
 </script>
