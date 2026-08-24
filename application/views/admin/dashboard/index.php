@@ -7,7 +7,7 @@
             <span class="eyebrow-chip">
                 <i class="bi bi-shield-lock-fill"></i> Admin Management Console
             </span>
-            <h2 class="banner-title">Welcome, <?php echo html_escape($this->session->userdata('name') ?: 'Administrator'); ?></h2>
+            <h2 class="banner-title">Welcome, <?php echo html_escape($this->session->userdata('admin_name') ?: 'Administrator'); ?></h2>
             <p class="banner-desc">Manage clinical drug registries, evaluate adverse interaction models, and monitor system health.</p>
         </div>
         <div class="banner-icon d-none d-md-flex">

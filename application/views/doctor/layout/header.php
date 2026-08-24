@@ -343,22 +343,16 @@ defined('BASEPATH') OR exit('No direct script access allowed');
             </li>
 
             <li class="sidebar-menu-item <?php echo ($current_segment2 === 'prescription-desk' || $current_segment2 === 'prescriptions') ? 'active' : ''; ?>">
-                <a href="<?php echo base_url('doctor/dashboard#prescription-desk'); ?>">
+                <a href="<?php echo base_url('doctor/prescription-desk'); ?>">
                     <i class="bi bi-prescription"></i>
-                    <span class="d-flex align-items-center justify-content-between flex-grow-1">
-                        <span>Prescription Desk</span>
-                        <span class="badge bg-teal-subtle text-teal border rounded-pill" style="font-size: 0.65rem; background-color: rgba(13, 148, 136, 0.2); color: #2dd4bf;">Next</span>
-                    </span>
+                    <span>Prescription Desk</span>
                 </a>
             </li>
 
-            <li class="sidebar-menu-item <?php echo ($current_segment2 === 'patient-history') ? 'active' : ''; ?>">
-                <a href="<?php echo base_url('doctor/dashboard#patient-history'); ?>">
+            <li class="sidebar-menu-item <?php echo ($current_segment2 === 'history') ? 'active' : ''; ?>">
+                <a href="<?php echo base_url('doctor/history'); ?>">
                     <i class="bi bi-clock-history"></i>
-                    <span class="d-flex align-items-center justify-content-between flex-grow-1">
-                        <span>Patient History</span>
-                        <span class="badge bg-secondary-subtle text-secondary border rounded-pill" style="font-size: 0.65rem; font-weight: 500;">Soon</span>
-                    </span>
+                    <span>Patient History</span>
                 </a>
             </li>
         </ul>
@@ -400,12 +394,12 @@ defined('BASEPATH') OR exit('No direct script access allowed');
                 <?php
                 $ci =& get_instance();
                 $ci->load->model('General_model');
-                $user_id = $this->session->userdata('user_id');
+                $user_id = $this->session->userdata('doctor_user_id');
                 $doc_user = $ci->General_model->getById('users', $user_id);
                 $doc_prof = $ci->General_model->getOne('doctor_profiles', ['user_id' => $user_id]);
                 
-                $name = ($doc_user && !empty($doc_user->name)) ? $doc_user->name : ($this->session->userdata('name') ?: 'Practitioner');
-                $email = ($doc_user && !empty($doc_user->email)) ? $doc_user->email : ($this->session->userdata('email') ?: '');
+                $name = ($doc_user && !empty($doc_user->name)) ? $doc_user->name : ($this->session->userdata('doctor_name') ?: 'Practitioner');
+                $email = ($doc_user && !empty($doc_user->email)) ? $doc_user->email : ($this->session->userdata('doctor_email') ?: '');
 
                 $initials = '';
                 if (!empty($name)) {
@@ -454,6 +448,13 @@ defined('BASEPATH') OR exit('No direct script access allowed');
                                     <?php echo !empty($doc_prof->specialization) ? html_escape($doc_prof->specialization) : 'Doctor'; ?>
                                 </span>
                             </div>
+                        </li>
+                        <li><hr class="dropdown-divider my-2" style="border-color: #f1f5f9;"></li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center gap-2.5 py-2 px-3 rounded-3 text-dark" href="<?php echo base_url('doctor/profile'); ?>">
+                                <i class="bi bi-person-gear fs-5 text-teal" style="color: #0f766e;"></i>
+                                <span style="font-weight: 500; font-size: 0.92rem;">My Profile</span>
+                            </a>
                         </li>
                         <li><hr class="dropdown-divider my-2" style="border-color: #f1f5f9;"></li>
                         <li>

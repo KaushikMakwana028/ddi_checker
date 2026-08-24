@@ -130,7 +130,7 @@ class DoctorManage extends Admin_Controller {
             'registration_number' => $registration_number,
             'medical_council'     => !empty($medical_council) ? $medical_council : NULL,
             'years_experience'    => ($years_experience !== '' && $years_experience !== NULL) ? (int)$years_experience : NULL,
-            'added_by_admin_id'   => $this->session->userdata('user_id'),
+            'added_by_admin_id'   => $this->session->userdata('admin_user_id'),
             'created_at'          => date('Y-m-d H:i:s'),
             'updated_at'          => date('Y-m-d H:i:s')
         ];
@@ -294,7 +294,7 @@ class DoctorManage extends Admin_Controller {
             $this->General_model->update('doctor_profiles', ['user_id' => $id], $profile_update);
         } else {
             $profile_update['user_id']           = $id;
-            $profile_update['added_by_admin_id'] = $this->session->userdata('user_id');
+            $profile_update['added_by_admin_id'] = $this->session->userdata('admin_user_id');
             $profile_update['created_at']        = date('Y-m-d H:i:s');
             $this->General_model->insert('doctor_profiles', $profile_update);
         }

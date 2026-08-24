@@ -362,6 +362,13 @@ defined('BASEPATH') OR exit('No direct script access allowed');
                     <span>Doctors</span>
                 </a>
             </li>
+
+            <li class="sidebar-menu-item <?php echo ($segment2 === 'patients' || $segment2 === 'PatientManage') ? 'active' : ''; ?>">
+                <a href="<?php echo base_url('admin/patients'); ?>">
+                    <i class="bi bi-person-badge-fill"></i>
+                    <span>Patients</span>
+                </a>
+            </li>
         </ul>
 
         <div class="sidebar-footer mt-auto p-3 border-top" style="border-color: #1e293b !important;">
@@ -401,11 +408,11 @@ defined('BASEPATH') OR exit('No direct script access allowed');
                 <?php
                 $ci =& get_instance();
                 $ci->load->model('General_model');
-                $user_id = $this->session->userdata('user_id');
+                $user_id = $this->session->userdata('admin_user_id');
                 $current_user = $ci->General_model->getById('users', $user_id);
                 
-                $name = ($current_user && !empty($current_user->name)) ? $current_user->name : ($this->session->userdata('name') ?: 'Administrator');
-                $email = ($current_user && !empty($current_user->email)) ? $current_user->email : ($this->session->userdata('email') ?: '');
+                $name = ($current_user && !empty($current_user->name)) ? $current_user->name : ($this->session->userdata('admin_name') ?: 'Administrator');
+                $email = ($current_user && !empty($current_user->email)) ? $current_user->email : ($this->session->userdata('admin_email') ?: '');
 
                 $initials = '';
                 if (!empty($name)) {

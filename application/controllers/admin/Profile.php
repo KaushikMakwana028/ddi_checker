@@ -22,7 +22,7 @@ class Profile extends Admin_Controller {
      * Display Admin Profile Page
      */
     public function index() {
-        $user_id = $this->session->userdata('user_id');
+        $user_id = $this->session->userdata('admin_user_id');
         $data['title']      = 'Admin Profile';
         $data['breadcrumb'] = 'Profile Settings';
         $data['user']       = $this->General_model->getById('users', $user_id);
@@ -44,7 +44,7 @@ class Profile extends Admin_Controller {
             show_error('Method not allowed', 405);
         }
 
-        $user_id = $this->session->userdata('user_id');
+        $user_id = $this->session->userdata('admin_user_id');
         $user    = $this->General_model->getById('users', $user_id);
 
         if (!$user) {
@@ -98,20 +98,20 @@ class Profile extends Admin_Controller {
                     }
 
                     $update_data['profile_image'] = $image_path;
-                    $this->session->set_userdata('profile_image', $image_path);
+                    $this->session->set_userdata('admin_profile_image', $image_path);
                 } else {
                     $upload_error = $this->upload->display_errors('', '');
                     $this->session->set_flashdata('error', 'Profile details saved, but image upload failed: ' . $upload_error);
                     $this->General_model->update('users', ['id' => $user_id], $update_data);
-                    $this->session->set_userdata('name', $update_data['name']);
-                    $this->session->set_userdata('email', $update_data['email']);
+                    $this->session->set_userdata('admin_name', $update_data['name']);
+                    $this->session->set_userdata('admin_email', $update_data['email']);
                     redirect('admin/profile');
                 }
             }
 
             if ($this->General_model->update('users', ['id' => $user_id], $update_data)) {
-                $this->session->set_userdata('name', $update_data['name']);
-                $this->session->set_userdata('email', $update_data['email']);
+                $this->session->set_userdata('admin_name', $update_data['name']);
+                $this->session->set_userdata('admin_email', $update_data['email']);
                 $this->session->set_flashdata('success', 'Profile details updated successfully.');
             } else {
                 $this->session->set_flashdata('error', 'Failed to update profile details.');
@@ -131,7 +131,7 @@ class Profile extends Admin_Controller {
             show_error('Method not allowed', 405);
         }
 
-        $user_id = $this->session->userdata('user_id');
+        $user_id = $this->session->userdata('admin_user_id');
         $user    = $this->General_model->getById('users', $user_id);
 
         if (!$user) {

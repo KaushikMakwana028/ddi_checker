@@ -24,8 +24,8 @@ class Doctor_Controller extends CI_Controller {
         $this->output->set_header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
 
         // Check if user is logged in and has role 0 (0 = doctor)
-        $is_logged_in = $this->session->userdata('logged_in');
-        $role         = $this->session->userdata('role');
+        $is_logged_in = $this->session->userdata('doctor_logged_in');
+        $role         = $this->session->userdata('doctor_role');
 
         if (!$is_logged_in || (int)$role !== 0) { // 0 = doctor
             $this->session->set_flashdata('error', 'Please sign in with a registered doctor account to continue.');

@@ -24,8 +24,8 @@ class Admin_Controller extends CI_Controller {
         $this->output->set_header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
 
         // Check if user is logged in and has role 1 (1 = admin)
-        $is_logged_in = $this->session->userdata('logged_in');
-        $role         = $this->session->userdata('role');
+        $is_logged_in = $this->session->userdata('admin_logged_in');
+        $role         = $this->session->userdata('admin_role');
 
         if (!$is_logged_in || (int)$role !== 1) { // 1 = admin
             $this->session->set_flashdata('error', 'Please sign in with an administrator account to continue.');

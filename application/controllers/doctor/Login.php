@@ -41,7 +41,7 @@ class Login extends CI_Controller {
      */
     public function login() {
         // If already authenticated as a doctor (role = 0), redirect to doctor dashboard
-        if ($this->session->userdata('logged_in') && (int)$this->session->userdata('role') === 0) { // 0 = doctor
+        if ($this->session->userdata('doctor_logged_in') && (int)$this->session->userdata('doctor_role') === 0) { // 0 = doctor
             redirect('doctor/dashboard');
         }
 
@@ -67,12 +67,12 @@ class Login extends CI_Controller {
 
                 // Set doctor session userdata (role = 0)
                 $this->session->set_userdata([
-                    'user_id'       => $doctor_user->id,
-                    'name'          => $doctor_user->name,
-                    'email'         => $doctor_user->email,
-                    'role'          => 0, // 0 = doctor, 1 = admin
-                    'profile_image' => $doctor_user->profile_image,
-                    'logged_in'     => TRUE
+                    'doctor_user_id'       => $doctor_user->id,
+                    'doctor_name'          => $doctor_user->name,
+                    'doctor_email'         => $doctor_user->email,
+                    'doctor_role'          => 0, // 0 = doctor, 1 = admin
+                    'doctor_profile_image' => $doctor_user->profile_image,
+                    'doctor_logged_in'     => TRUE
                 ]);
 
                 redirect('doctor/dashboard');
@@ -98,7 +98,7 @@ class Login extends CI_Controller {
      */
     public function register() {
         // If already authenticated as a doctor (role = 0), redirect to doctor dashboard
-        if ($this->session->userdata('logged_in') && (int)$this->session->userdata('role') === 0) { // 0 = doctor
+        if ($this->session->userdata('doctor_logged_in') && (int)$this->session->userdata('doctor_role') === 0) { // 0 = doctor
             redirect('doctor/dashboard');
         }
 
@@ -180,7 +180,7 @@ class Login extends CI_Controller {
      * Doctor Logout
      */
     public function logout() {
-        $this->session->sess_destroy();
+        $this->session->unset_userdata(['doctor_user_id', 'doctor_name', 'doctor_email', 'doctor_role', 'doctor_profile_image', 'doctor_logged_in']);
         redirect('doctor/login');
     }
 }

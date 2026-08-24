@@ -41,7 +41,7 @@ class Login extends CI_Controller {
      */
     public function login() {
         // If already authenticated as an admin (role = 1), redirect to admin dashboard
-        if ($this->session->userdata('logged_in') && (int)$this->session->userdata('role') === 1) { // 1 = admin
+        if ($this->session->userdata('admin_logged_in') && (int)$this->session->userdata('admin_role') === 1) { // 1 = admin
             redirect('admin/dashboard');
         }
 
@@ -67,12 +67,12 @@ class Login extends CI_Controller {
 
                 // Set admin session userdata (role = 1)
                 $this->session->set_userdata([
-                    'user_id'       => $admin_user->id,
-                    'name'          => $admin_user->name,
-                    'email'         => $admin_user->email,
-                    'role'          => 1, // 1 = admin, 0 = doctor
-                    'profile_image' => $admin_user->profile_image,
-                    'logged_in'     => TRUE
+                    'admin_user_id'       => $admin_user->id,
+                    'admin_name'          => $admin_user->name,
+                    'admin_email'         => $admin_user->email,
+                    'admin_role'          => 1, // 1 = admin, 0 = doctor
+                    'admin_profile_image' => $admin_user->profile_image,
+                    'admin_logged_in'     => TRUE
                 ]);
 
                 redirect('admin/dashboard');
@@ -98,7 +98,7 @@ class Login extends CI_Controller {
      */
     public function register() {
         // If already authenticated as an admin, redirect to admin dashboard
-        if ($this->session->userdata('logged_in') && (int)$this->session->userdata('role') === 1) { // 1 = admin
+        if ($this->session->userdata('admin_logged_in') && (int)$this->session->userdata('admin_role') === 1) { // 1 = admin
             redirect('admin/dashboard');
         }
 
@@ -144,7 +144,7 @@ class Login extends CI_Controller {
      * Admin Logout
      */
     public function logout() {
-        $this->session->sess_destroy();
+        $this->session->unset_userdata(['admin_user_id', 'admin_name', 'admin_email', 'admin_role', 'admin_profile_image', 'admin_logged_in']);
         redirect('admin/login');
     }
 }

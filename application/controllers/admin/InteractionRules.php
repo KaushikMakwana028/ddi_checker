@@ -223,7 +223,7 @@ class InteractionRules extends Admin_Controller {
             'remarks'     => $remarks,
             'source'      => !empty($source) ? $source : NULL,
             'is_active'   => 1,
-            'created_by'  => $this->session->userdata('user_id'),
+            'created_by'  => $this->session->userdata('admin_user_id'),
             'created_at'  => date('Y-m-d H:i:s'),
             'updated_at'  => date('Y-m-d H:i:s')
         ];
@@ -745,7 +745,7 @@ class InteractionRules extends Admin_Controller {
 
         // Pass 2: Execution (atomic database transactions)
         $this->db->trans_begin();
-        $admin_id = $this->session->userdata('user_id');
+        $admin_id = $this->session->userdata('admin_user_id');
         $now = date('Y-m-d H:i:s');
         $imported = 0;
         $skipped  = 0;
