@@ -27,22 +27,58 @@ class PatientManage extends Admin_Controller {
 
         $search = trim($this->input->get('search', TRUE) ?? '');
 
-        // Query joining patients with doctors and their profile for hospital names
-        $sql = "SELECT p.*, u.name AS doctor_name, dp.hospital_clinic AS hospital_name
-                FROM patients p
-                LEFT JOIN users u ON u.id = p.doctor_id
-                LEFT JOIN doctor_profiles dp ON dp.user_id = p.doctor_id";
+        // Precompute statistics via optimized queries
+        $data['total_patients']  = $this->General_model->getCount('patients');
+        $data['male_count']      = $this->db->where('LOWER(gender)', 'male')->count_all_results('patients');
+        $data['female_count']    = $this->db->where('LOWER(gender)', 'female')->count_all_results('patients');
+        
+        $hosp_query = $this->db->query("SELECT COUNT(DISTINCT LOWER(TRIM(dp.hospital_clinic))) as count 
+                                        FROM patients p
+                                        JOIN doctor_profiles dp ON dp.user_id = p.doctor_id 
+                                        WHERE dp.hospital_clinic IS NOT NULL AND dp.hospital_clinic != ''");
+        $data['unique_hospitals'] = $hosp_query->row()->count ?? 0;
 
-        if (!empty($search)) {
-            $sql .= " WHERE p.full_name LIKE " . $this->db->escape('%' . $search . '%') . " 
-                      OR p.contact_number LIKE " . $this->db->escape('%' . $search . '%') . " 
-                      OR u.name LIKE " . $this->db->escape('%' . $search . '%') . " 
-                      OR dp.hospital_clinic LIKE " . $this->db->escape('%' . $search . '%');
+        // If AJAX request, return raw data in JSON for client-side JavaScript rendering
+        if ($this->input->is_ajax_request() || $this->input->get('ajax') == 1) {
+            $limit_param = $this->input->get('limit');
+            if ($limit_param === '-1') {
+                $limit = 999999;
+            } else {
+                $limit = (int)$limit_param;
+                if ($limit <= 0) {
+                    $limit = 10; // default
+                }
+            }
+
+            $page = max(1, (int)$this->input->get('page'));
+            $total_rows = $this->General_model->get_patients_count($search);
+            $total_pages = max(1, ceil($total_rows / $limit));
+            if ($page > $total_pages && $total_rows > 0) {
+                $page = $total_pages;
+            }
+            $offset = ($page - 1) * $limit;
+
+            $patients = $this->General_model->get_paginated_patients($limit, $offset, $search);
+
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status'       => 'success',
+                'patients'     => $patients,
+                'total_rows'   => $total_rows,
+                'total_pages'  => $total_pages,
+                'current_page' => $page,
+                'limit'        => $limit,
+                'offset'       => $offset,
+                'stats'        => [
+                    'total_patients'   => $data['total_patients'],
+                    'male_count'       => $data['male_count'],
+                    'female_count'     => $data['female_count'],
+                    'unique_hospitals' => $data['unique_hospitals']
+                ]
+            ]));
+            return;
         }
 
-        $sql .= " ORDER BY p.id DESC";
-
-        $data['patients'] = $this->General_model->query($sql);
+        $data['patients'] = [];
         $data['search']   = $search;
 
         // Load admin layouts and patients view

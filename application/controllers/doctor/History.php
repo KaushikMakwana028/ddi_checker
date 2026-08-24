@@ -20,6 +20,7 @@ if (!class_exists('Doctor_Controller')) {
  */
 class History extends Doctor_Controller {
 
+
     public function __construct() {
         parent::__construct();
     }
@@ -27,7 +28,7 @@ class History extends Doctor_Controller {
     /**
      * Display prescription history with statistics, search, date-range filters, and pagination
      */
-    public function index($offset = 0) {
+    public function index() {
         $doctor_id = $this->session->userdata('doctor_user_id');
         $search = trim($this->input->get('search', TRUE) ?? '');
         $from_date = trim($this->input->get('from_date', TRUE) ?? '');
@@ -45,56 +46,47 @@ class History extends Doctor_Controller {
         $applied_from = empty($date_error) ? $from_date : '';
         $applied_to = empty($date_error) ? $to_date : '';
 
-        // Get total rows with combined filters
-        $total_rows = $this->General_model->get_history_count($doctor_id, $search, $applied_from, $applied_to);
+        // If AJAX request, return raw data in JSON for client-side JavaScript rendering
+        if ($this->input->is_ajax_request() || $this->input->get('ajax') == 1) {
+            $limit = 25; // fixed per-page for history list
 
-        // Load and configure CodeIgniter Pagination Library
-        $this->load->library('pagination');
-        $config['base_url']             = base_url('doctor/history');
-        $config['total_rows']           = $total_rows;
-        $config['per_page']             = 25;
-        $config['uri_segment']          = 3;
-        $config['reuse_query_string']   = TRUE;
+            $page = max(1, (int)$this->input->get('page'));
+            $total_rows = $this->General_model->get_history_count($doctor_id, $search, $applied_from, $applied_to);
+            $total_pages = max(1, ceil($total_rows / $limit));
+            if ($page > $total_pages && $total_rows > 0) {
+                $page = $total_pages;
+            }
+            $offset = ($page - 1) * $limit;
 
-        // Custom HTML tags to integrate Bootstrap styling
-        $config['full_tag_open']    = '<ul class="pagination pagination-sm justify-content-center m-0">';
-        $config['full_tag_close']   = '</ul>';
-        $config['first_link']       = 'First';
-        $config['last_link']        = 'Last';
-        $config['first_tag_open']   = '<li class="page-item">';
-        $config['first_tag_close']  = '</li>';
-        $config['prev_link']        = '<i class="bi bi-chevron-left"></i>';
-        $config['prev_tag_open']    = '<li class="page-item">';
-        $config['prev_tag_close']   = '</li>';
-        $config['next_link']        = '<i class="bi bi-chevron-right"></i>';
-        $config['next_tag_open']    = '<li class="page-item">';
-        $config['next_tag_close']   = '</li>';
-        $config['last_tag_open']    = '<li class="page-item">';
-        $config['last_tag_close']   = '</li>';
-        $config['cur_tag_open']     = '<li class="page-item active"><a class="page-link border-0 text-white" style="background-color: #0f766e;" href="#">';
-        $config['cur_tag_close']    = '</a></li>';
-        $config['num_tag_open']     = '<li class="page-item">';
-        $config['num_tag_close']    = '</li>';
-        $config['attributes']       = ['class' => 'page-link', 'style' => 'color: #0f766e; border-color: #e2e8f0;'];
+            $prescriptions = $this->General_model->get_paginated_history($doctor_id, $limit, $offset, $search, $applied_from, $applied_to);
+            $stats = $this->General_model->get_history_stats($doctor_id);
 
-        $this->pagination->initialize($config);
-
-        // Fetch records with combined filters
-        $prescriptions = $this->General_model->get_paginated_history($doctor_id, $config['per_page'], $offset, $search, $applied_from, $applied_to);
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status'        => 'success',
+                'prescriptions' => $prescriptions,
+                'total_rows'    => $total_rows,
+                'total_pages'   => $total_pages,
+                'current_page'  => $page,
+                'limit'         => $limit,
+                'offset'        => $offset,
+                'stats'         => $stats
+            ]));
+            return;
+        }
 
         // Load stats (always all-time / daily totals scoped to doctor)
         $stats = $this->General_model->get_history_stats($doctor_id);
 
         $data['title']          = 'Patient History';
         $data['breadcrumb']     = 'History';
-        $data['prescriptions']  = $prescriptions;
+        $data['prescriptions']  = [];
         $data['stats']          = $stats;
         $data['search']         = $search;
         $data['from_date']      = $from_date;
         $data['to_date']        = $to_date;
         $data['date_error']     = $date_error;
-        $data['pagination']     = $this->pagination->create_links();
-        $data['total_count']    = $total_rows;
+        $data['pagination']     = '';
+        $data['total_count']    = 0;
 
         // Render views
         $this->load->view('doctor/layout/header', $data);

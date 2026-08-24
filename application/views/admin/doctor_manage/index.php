@@ -684,113 +684,163 @@ document.addEventListener('DOMContentLoaded', function() {
     const doctorSearchInput = document.getElementById('doctorSearchInput');
     const clearDoctorSearchBtn = document.getElementById('clearDoctorSearchBtn');
 
-    // 1. Client-Side Live Search Filtering & Pagination
+    // 1. Server-Side Live Search Filtering & Pagination
     let currentPage = 1;
+    let isFetching = false;
 
-    if (doctorSearchInput) {
-        doctorSearchInput.addEventListener('keyup', function() {
-            currentPage = 1;
-            paginateDoctors();
-        });
-    }
+    function fetchDoctors() {
+        if (isFetching) return;
+        isFetching = true;
 
-    const pageSizeSelect = document.getElementById('pageSizeSelect');
-    if (pageSizeSelect) {
-        pageSizeSelect.addEventListener('change', function() {
-            currentPage = 1;
-            paginateDoctors();
-        });
-    }
-
-    if (clearDoctorSearchBtn) {
-        clearDoctorSearchBtn.addEventListener('click', function() {
-            if (doctorSearchInput) {
-                doctorSearchInput.value = '';
-                if (pageSizeSelect) pageSizeSelect.value = '10';
-                currentPage = 1;
-                paginateDoctors();
-            }
-        });
-    }
-
-    function paginateDoctors() {
-        const query = doctorSearchInput ? doctorSearchInput.value.toLowerCase().trim() : '';
-        const rows = document.querySelectorAll('#doctorsTableBody tr.doctor-row');
-        
+        const query = doctorSearchInput ? doctorSearchInput.value.trim() : '';
         const pageSizeSelect = document.getElementById('pageSizeSelect');
-        const selectedLimit = pageSizeSelect ? parseInt(pageSizeSelect.value) : 10;
-        const currentLimit = selectedLimit === -1 ? rows.length : selectedLimit;
+        const limit = pageSizeSelect ? pageSizeSelect.value : 10;
 
-        const matchedRows = [];
-        rows.forEach(row => {
-            const name = row.querySelector('.doctor-name-cell') ? row.querySelector('.doctor-name-cell').textContent.toLowerCase() : '';
-            const email = row.querySelector('.doctor-email-cell') ? row.querySelector('.doctor-email-cell').textContent.toLowerCase() : '';
-            const spec = row.querySelector('.doctor-spec-cell') ? row.querySelector('.doctor-spec-cell').textContent.toLowerCase() : '';
-            const hosp = row.querySelector('.doctor-hospital-cell') ? row.querySelector('.doctor-hospital-cell').textContent.toLowerCase() : '';
-            const reg = row.querySelector('.doctor-reg-cell') ? row.querySelector('.doctor-reg-cell').textContent.toLowerCase() : '';
-            
-            if (name.includes(query) || email.includes(query) || spec.includes(query) || hosp.includes(query) || reg.includes(query)) {
-                matchedRows.push(row);
-            } else {
-                row.style.display = 'none';
-            }
-        });
-
-        const totalRows = matchedRows.length;
-        const totalPages = Math.ceil(totalRows / currentLimit);
-        
-        if (currentPage < 1) currentPage = 1;
-        if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
-
-        const startIndex = (currentPage - 1) * currentLimit;
-        const endIndex = startIndex + currentLimit;
-
-        matchedRows.forEach((row, idx) => {
-            if (idx >= startIndex && idx < endIndex) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
-
-        const existingNoResults = document.getElementById('noResultsDoctorRow');
-        if (totalRows === 0 && rows.length > 0) {
-            if (!existingNoResults) {
-                const noResults = document.createElement('tr');
-                noResults.id = 'noResultsDoctorRow';
-                noResults.innerHTML = `
+        // Show loading spinner
+        if (doctorsTableBody) {
+            doctorsTableBody.innerHTML = `
+                <tr class="loading-row">
                     <td colspan="7" class="text-center py-5 text-muted">
-                        <div class="empty-state">
-                            <i class="bi bi-search"></i>
-                            <h3>No matching doctors</h3>
-                            <p>No practitioners match: "<strong>${escapeHtml(query)}</strong>"</p>
-                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3 py-1.5" onclick="document.getElementById('clearDoctorSearchBtn').click()">Reset Search</button>
+                        <div class="d-flex flex-column align-items-center justify-content-center">
+                            <div class="spinner-border text-teal mb-2" role="status" style="width: 2.5rem; height: 2.5rem; color: #0f766e;"></div>
+                            <span>Loading practitioners...</span>
                         </div>
                     </td>
-                `;
-                doctorsTableBody.appendChild(noResults);
-            } else {
-                existingNoResults.style.display = '';
-                existingNoResults.querySelector('p').innerHTML = `No practitioners match: "<strong>${escapeHtml(query)}</strong>"`;
-            }
-        } else if (existingNoResults) {
-            existingNoResults.style.display = 'none';
+                </tr>
+            `;
         }
+
+        const url = new URL('<?php echo base_url("admin/doctors"); ?>');
+        url.searchParams.append('ajax', '1');
+        url.searchParams.append('page', currentPage);
+        url.searchParams.append('limit', limit);
+        if (query) {
+            url.searchParams.append('search', query);
+        }
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                isFetching = false;
+                if (data.status === 'success') {
+                    renderTable(data.doctors, data.current_page, data.total_rows, data.limit, data.total_pages);
+                    updateStats(data.stats);
+                }
+            })
+            .catch(error => {
+                isFetching = false;
+                console.error('Error fetching doctors:', error);
+                if (doctorsTableBody) {
+                    doctorsTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-danger">
+                                <i class="bi bi-exclamation-triangle-fill fs-2"></i>
+                                <p class="mt-2 mb-0">Failed to load practitioners. Please try again.</p>
+                            </td>
+                        </tr>
+                    `;
+                }
+            });
+    }
+
+    function renderTable(doctors, currentPage, totalRows, limit, totalPages) {
+        if (!doctorsTableBody) return;
+        if (!doctors || doctors.length === 0) {
+            const query = doctorSearchInput ? doctorSearchInput.value.trim() : '';
+            doctorsTableBody.innerHTML = `
+                <tr class="no-doctors-row">
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <div class="empty-state">
+                            <i class="bi bi-person-x" style="font-size: 3rem; color: #94a3b8 !important;"></i>
+                            <h3 class="fw-bold text-dark mt-2" style="font-size: 1.25rem;">No doctors found</h3>
+                            ${query ? `<p class="text-secondary small">No practitioners match: "<strong>${escapeHtml(query)}</strong>"</p>
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3 py-1.5 mt-2" onclick="document.getElementById('clearDoctorSearchBtn').click()">Reset Search</button>` : `
+                            <p class="text-secondary small">Get started by registering your first clinical practitioner.</p>
+                            <a href="<?php echo base_url('admin/doctors/add'); ?>" class="btn-primary mt-2">
+                                <i class="bi bi-person-plus-fill"></i> Add New Doctor
+                            </a>`}
+                        </div>
+                    </td>
+                </tr>
+            `;
+            const pagWrap = document.getElementById('paginationWrapper');
+            if (pagWrap) pagWrap.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+        doctors.forEach(doc => {
+            // Get initials
+            let initials = '';
+            const words = (doc.name || '').split(' ');
+            words.forEach(w => {
+                initials += w.substring(0, 1);
+            });
+            initials = initials.substring(0, 2).toUpperCase() || 'DR';
+
+            html += `
+                <tr class="doctor-row" data-id="${doc.id}">
+                    <td class="ps-3">
+                        <div class="d-flex align-items-center gap-2.5">
+                            <div class="avatar-circle shadow-sm" style="width: 36px; height: 36px; min-width: 36px; background-color: #f0fdfa; border: 1px solid #99f6e4; color: #0f766e; font-size: 0.85rem; font-weight: 700; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                ${escapeHtml(initials)}
+                            </div>
+                            <div class="d-flex flex-column text-truncate" style="min-width: 0;">
+                                <span class="fw-semibold text-dark text-truncate doctor-name-cell">${escapeHtml(doc.name)}</span>
+                                <small class="text-muted text-truncate doctor-email-cell">${escapeHtml(doc.email)}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="text-secondary doctor-mobile-cell">
+                        <span class="text-nowrap"><i class="bi bi-telephone text-muted me-1 small"></i>${escapeHtml(doc.mobile)}</span>
+                    </td>
+                    <td class="doctor-spec-cell">
+                        ${doc.specialization ? `<span class="category-badge">${escapeHtml(doc.specialization)}</span>` : '<span class="text-muted small">General Practice</span>'}
+                    </td>
+                    <td class="text-secondary doctor-hospital-cell">
+                        ${doc.hospital_clinic ? escapeHtml(doc.hospital_clinic) : '<span class="text-muted small">—</span>'}
+                    </td>
+                    <td class="doctor-reg-cell">
+                        <span class="stock-badge">
+                            <i class="bi bi-shield-check text-teal"></i>
+                            ${escapeHtml(doc.registration_number || '—')}
+                        </span>
+                    </td>
+                    <td class="status-cell">
+                        ${parseInt(doc.is_active) === 1 ? '<span class="status-badge status-active"><i class="bi bi-dot"></i>Active</span>' : '<span class="status-badge status-inactive"><i class="bi bi-dot"></i>Inactive</span>'}
+                    </td>
+                    <td class="text-end pe-3 actions-cell">
+                        <div class="actions-group">
+                            <a href="<?php echo base_url('admin/doctors/edit/'); ?>${doc.id}" class="rule-action-btn edit-doctor-btn" title="Edit Doctor" aria-label="Edit Doctor">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+                            ${parseInt(doc.is_active) === 1 ? `
+                                <button type="button" class="rule-action-btn btn-warning-soft deactivate-doctor-btn" data-id="${doc.id}" data-name="${escapeHtml(doc.name)}" title="Deactivate Doctor" aria-label="Deactivate Doctor">
+                                    <i class="bi bi-pause-circle"></i>
+                                </button>
+                            ` : `
+                                <button type="button" class="rule-action-btn btn-success-soft activate-doctor-btn" data-id="${doc.id}" data-name="${escapeHtml(doc.name)}" title="Activate Doctor" aria-label="Activate Doctor">
+                                    <i class="bi bi-play-circle"></i>
+                                </button>
+                            `}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        doctorsTableBody.innerHTML = html;
 
         // Render pagination footer inside paginationWrapper
         const pagWrap = document.getElementById('paginationWrapper');
         if (!pagWrap) return;
 
-        if (totalRows === 0) {
-            pagWrap.innerHTML = '';
-            return;
-        }
-
-        const showingTo = Math.min(startIndex + currentLimit, totalRows);
+        const offset = (currentPage - 1) * limit;
+        const showingTo = Math.min(offset + parseInt(limit), totalRows);
         let pagHtml = `
             <div class="ddi-footer">
                 <div class="footer-count">
-                    Showing <strong>${totalRows > 0 ? startIndex + 1 : 0}</strong>–<strong>${showingTo}</strong> of <strong>${totalRows}</strong> practitioners
+                    Showing <strong>${totalRows > 0 ? offset + 1 : 0}</strong>–<strong>${showingTo}</strong> of <strong>${totalRows}</strong> practitioners
                 </div>
         `;
 
@@ -798,18 +848,7 @@ document.addEventListener('DOMContentLoaded', function() {
             pagHtml += `<nav class="ddi-pagination">`;
             pagHtml += `<a href="#" class="page-nav-btn ${currentPage <= 1 ? 'disabled' : ''}" data-page="${currentPage - 1}"><i class="bi bi-chevron-left"></i></a>`;
 
-            let pages = [];
-            if (totalPages <= 5) {
-                for (let i = 1; i <= totalPages; i++) pages.push(i);
-            } else {
-                if (currentPage <= 3) {
-                    pages.push(1, 2, 3, '...', totalPages);
-                } else if (currentPage >= totalPages - 2) {
-                    pages.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
-                } else {
-                    pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
-                }
-            }
+            let pages = getPaginationPages(currentPage, totalPages);
 
             pages.forEach(p => {
                 if (p === '...') {
@@ -827,6 +866,84 @@ document.addEventListener('DOMContentLoaded', function() {
         pagWrap.innerHTML = pagHtml;
     }
 
+    function getPaginationPages(currentPage, totalPages) {
+        if (totalPages <= 7) {
+            let pages = [];
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+            return pages;
+        }
+        
+        let pages = [];
+        pages.push(1);
+        
+        let start = Math.max(2, currentPage - 1);
+        let end = Math.min(totalPages - 1, currentPage + 1);
+        
+        if (start > 2) {
+            pages.push('...');
+        }
+        
+        for (let i = start; i <= end; i++) {
+            pages.push(i);
+        }
+        
+        if (end < totalPages - 1) {
+            pages.push('...');
+        }
+        
+        pages.push(totalPages);
+        return pages;
+    }
+
+    function updateStats(stats) {
+        if (!stats) return;
+        
+        const totalVal = document.querySelector('.stat-card.stat-total .stat-value');
+        if (totalVal) totalVal.textContent = parseInt(stats.total_doctors).toLocaleString();
+        
+        const activeVal = document.querySelector('.stat-card.stat-active .stat-value');
+        if (activeVal) activeVal.textContent = parseInt(stats.active_doctors).toLocaleString();
+        
+        const inactiveVal = document.querySelector('.stat-card.stat-inactive .stat-value');
+        if (inactiveVal) inactiveVal.textContent = parseInt(stats.inactive_doctors).toLocaleString();
+        
+        const specVal = document.querySelector('.stat-card.stat-spec .stat-value');
+        if (specVal) specVal.textContent = parseInt(stats.unique_specs).toLocaleString();
+        
+        const hospVal = document.querySelector('.stat-card.stat-hosp .stat-value');
+        if (hospVal) hospVal.textContent = parseInt(stats.unique_hospitals).toLocaleString();
+    }
+
+    if (doctorSearchInput) {
+        let searchTimeout = null;
+        doctorSearchInput.addEventListener('keyup', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentPage = 1;
+                fetchDoctors();
+            }, 300);
+        });
+    }
+
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', function() {
+            currentPage = 1;
+            fetchDoctors();
+        });
+    }
+
+    if (clearDoctorSearchBtn) {
+        clearDoctorSearchBtn.addEventListener('click', function() {
+            if (doctorSearchInput) {
+                doctorSearchInput.value = '';
+                if (pageSizeSelect) pageSizeSelect.value = '10';
+                currentPage = 1;
+                fetchDoctors();
+            }
+        });
+    }
+
     // Setup page navigation listener
     const paginationWrapper = document.getElementById('paginationWrapper');
     if (paginationWrapper) {
@@ -835,7 +952,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!btn || btn.classList.contains('disabled') || !btn.dataset.page) return;
             e.preventDefault();
             currentPage = parseInt(btn.dataset.page);
-            paginateDoctors();
+            fetchDoctors();
         });
     }
 
@@ -931,20 +1048,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function refreshDoctorsTable() {
-        fetch('<?php echo base_url("admin/doctors"); ?>')
-            .then(response => response.text())
-            .then(html => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                const newTableBody = doc.getElementById('doctorsTableBody');
-                if (newTableBody && doctorsTableBody) {
-                    doctorsTableBody.innerHTML = newTableBody.innerHTML;
-                    paginateDoctors();
-                }
-            })
-            .catch(error => {
-                console.error('Error refreshing doctor list:', error);
-            });
+        fetchDoctors();
     }
 
     function updateCsrfTokens(name, hash) {
@@ -988,6 +1092,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Trigger initial pagination
-    paginateDoctors();
+    fetchDoctors();
 });
 </script>

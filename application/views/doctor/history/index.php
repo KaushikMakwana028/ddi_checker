@@ -149,102 +149,38 @@
                 <i class="bi bi-journal-medical ph-icon-teal"></i>
                 <span>Prescription Records</span>
             </h5>
-            <?php if (!empty($search)): ?>
-                <span class="badge ph-match-badge">
-                    Found <?php echo $total_count; ?> matching records
-                </span>
-            <?php endif; ?>
+            <span class="badge ph-match-badge" id="historyCountBadge" style="display: none;"></span>
         </div>
 
-        <?php if (empty($prescriptions)): ?>
-            <!-- Empty State -->
-            <div class="card-body py-5 text-center">
-                <div class="ph-empty-icon"><i class="bi bi-inbox-fill"></i></div>
-                <h4 class="fw-bold text-dark">No Prescriptions Found</h4>
-                <p class="text-secondary small mb-4">
-                    <?php if (!empty($search)): ?>
-                        No prescription records match your search criteria. Try a different query or clear the filter.
-                    <?php else: ?>
-                        No prescriptions have been finalized yet. Visit the Prescription Desk to create one.
-                    <?php endif; ?>
-                </p>
-                <?php if (!empty($search)): ?>
-                    <a href="<?php echo base_url('doctor/history'); ?>" class="btn btn-teal px-4 fw-semibold"><i class="bi bi-arrow-left"></i> Clear Filter</a>
-                <?php else: ?>
-                    <a href="<?php echo base_url('doctor/prescription-desk'); ?>" class="btn btn-teal px-4 fw-semibold"><i class="bi bi-plus-lg"></i> Go to Prescription Desk</a>
-                <?php endif; ?>
-            </div>
-        <?php else: ?>
-            <!-- Responsive Table & Stacked Grid -->
-            <div class="card-body p-0">
-                <!-- Desktop Table View -->
-                <div class="table-responsive d-none d-md-block">
-                    <table class="table table-hover align-middle mb-0 ph-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 15%;">Invoice No.</th>
-                                <th style="width: 15%;">Visit Date</th>
-                                <th style="width: 30%;">Patient Name</th>
-                                <th style="width: 18%;">Contact Number</th>
-                                <th style="width: 12%;" class="text-center"># Medicines</th>
-                                <th style="width: 10%;" class="text-end">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($prescriptions as $p): ?>
-                                <tr>
-                                    <td class="fw-bold ph-invoice-cell"><?php echo html_escape($p['invoice_number']); ?></td>
-                                    <td class="text-secondary"><?php echo date('d-M-Y', strtotime($p['visit_date'])); ?></td>
-                                    <td class="fw-semibold"><?php echo html_escape($p['patient_name']); ?></td>
-                                    <td class="text-secondary"><?php echo html_escape($p['patient_contact'] ?: '—'); ?></td>
-                                    <td class="text-center">
-                                        <span class="badge ph-med-badge"><?php echo html_escape($p['medicine_count']); ?> Med(s)</span>
-                                    </td>
-                                    <td class="text-end">
-                                        <a href="<?php echo base_url('doctor/history/view-invoice/' . $p['id']); ?>" class="btn btn-sm btn-outline-teal fw-semibold d-inline-flex align-items-center gap-1 ph-view-btn">
-                                            <i class="bi bi-eye"></i> View
-                                        </a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Mobile Card Stack View -->
-                <div class="d-block d-md-none p-3">
-                    <div class="row g-3">
-                        <?php foreach ($prescriptions as $p): ?>
-                            <div class="col-12">
-                                <div class="ph-record-card">
-                                    <div class="ph-record-top">
-                                        <div class="ph-record-invoice-wrap">
-                                            <span class="ph-record-invoice"><?php echo html_escape($p['invoice_number']); ?></span>
-                                            <span class="ph-record-date"><?php echo date('d-M-Y', strtotime($p['visit_date'])); ?></span>
-                                        </div>
-                                        <span class="badge ph-med-badge"><?php echo html_escape($p['medicine_count']); ?> Med(s)</span>
-                                    </div>
-                                    <div class="ph-record-body">
-                                        <div class="ph-record-patient"><?php echo html_escape($p['patient_name']); ?></div>
-                                        <div class="ph-record-contact"><i class="bi bi-telephone me-1"></i> <?php echo html_escape($p['patient_contact'] ?: '—'); ?></div>
-                                    </div>
-                                    <a href="<?php echo base_url('doctor/history/view-invoice/' . $p['id']); ?>" class="btn btn-teal w-100 fw-semibold py-2 d-flex align-items-center justify-content-center gap-2 rounded-3">
-                                        <i class="bi bi-eye"></i> View Prescription
-                                    </a>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
+        <div class="card-body p-0" id="historyListContainer">
+            <!-- Desktop Table View -->
+            <div class="table-responsive d-none d-md-block">
+                <table class="table table-hover align-middle mb-0 ph-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">Invoice No.</th>
+                            <th style="width: 15%;">Visit Date</th>
+                            <th style="width: 30%;">Patient Name</th>
+                            <th style="width: 18%;">Contact Number</th>
+                            <th style="width: 12%;" class="text-center"># Medicines</th>
+                            <th style="width: 10%;" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                    </tbody>
+                </table>
             </div>
 
-            <!-- Pagination Block -->
-            <?php if (!empty($pagination)): ?>
-                <div class="card-footer bg-white py-3 border-top d-flex justify-content-center">
-                    <?php echo $pagination; ?>
+            <!-- Mobile Card Stack View -->
+            <div class="d-block d-md-none p-3">
+                <div class="row g-3" id="historyMobileCards">
                 </div>
-            <?php endif; ?>
-        <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Pagination Block -->
+        <div class="card-footer bg-white py-3 border-top d-flex justify-content-center" id="paginationWrapper">
+        </div>
     </div>
 </div>
 
@@ -661,6 +597,308 @@
 </style>
 
 <script>
+    let currentPage = 1;
+    let isFetching = false;
+
+    const historyTableBody = document.getElementById('historyTableBody');
+    const historyMobileCards = document.getElementById('historyMobileCards');
+    const historyListContainer = document.getElementById('historyListContainer');
+    const historyFilterForm = document.getElementById('historyFilterForm');
+    const paginationWrapper = document.getElementById('paginationWrapper');
+    const historyCountBadge = document.getElementById('historyCountBadge');
+
+    function fetchHistory() {
+        if (isFetching) return;
+        isFetching = true;
+
+        const form = document.getElementById('historyFilterForm');
+        const search = form.querySelector('[name="search"]').value.trim();
+        const fromDate = form.querySelector('[name="from_date"]').value;
+        const toDate = form.querySelector('[name="to_date"]').value;
+
+        // Show loading indicator
+        if (historyTableBody) {
+            historyTableBody.innerHTML = `
+                <tr class="loading-row">
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <div class="d-flex flex-column align-items-center justify-content-center">
+                            <div class="spinner-border text-teal mb-2" role="status" style="width: 2.5rem; height: 2.5rem; color: #0f766e;"></div>
+                            <span>Loading history...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        if (historyMobileCards) {
+            historyMobileCards.innerHTML = `
+                <div class="col-12 text-center py-5 text-muted">
+                    <div class="spinner-border text-teal mb-2" role="status" style="width: 2.5rem; height: 2.5rem; color: #0f766e;"></div>
+                    <div>Loading history...</div>
+                </div>
+            `;
+        }
+
+        const url = new URL('<?php echo base_url("doctor/history"); ?>');
+        url.searchParams.append('ajax', '1');
+        url.searchParams.append('page', currentPage);
+        if (search) url.searchParams.append('search', search);
+        if (fromDate) url.searchParams.append('from_date', fromDate);
+        if (toDate) url.searchParams.append('to_date', toDate);
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                isFetching = false;
+                if (data.status === 'success') {
+                    renderTable(data.prescriptions, data.current_page, data.total_rows, data.limit, data.total_pages);
+                    updateStats(data.stats);
+                }
+            })
+            .catch(error => {
+                isFetching = false;
+                console.error('Error fetching prescription history:', error);
+                const errorHtml = `
+                    <tr class="error-row">
+                        <td colspan="6" class="text-center py-5 text-danger">
+                            <i class="bi bi-exclamation-triangle-fill fs-2"></i>
+                            <p class="mt-2 mb-0">Failed to load history. Please try again.</p>
+                        </td>
+                    </tr>
+                `;
+                if (historyTableBody) historyTableBody.innerHTML = errorHtml;
+                if (historyMobileCards) {
+                    historyMobileCards.innerHTML = `
+                        <div class="col-12 text-center py-5 text-danger">
+                            <i class="bi bi-exclamation-triangle-fill fs-2"></i>
+                            <p class="mt-2 mb-0">Failed to load history. Please try again.</p>
+                        </div>
+                    `;
+                }
+            });
+    }
+
+    function renderTable(prescriptions, currentPage, totalRows, limit, totalPages) {
+        const form = document.getElementById('historyFilterForm');
+        const search = form.querySelector('[name="search"]').value.trim();
+
+        if (historyCountBadge) {
+            if (totalRows > 0) {
+                historyCountBadge.textContent = `Found ${totalRows} matching record${totalRows === 1 ? '' : 's'}`;
+                historyCountBadge.style.display = 'inline-block';
+            } else {
+                historyCountBadge.style.display = 'none';
+            }
+        }
+
+        if (!prescriptions || prescriptions.length === 0) {
+            const emptyHtml = `
+                <div class="card-body py-5 text-center w-100">
+                    <div class="ph-empty-icon"><i class="bi bi-inbox-fill" style="font-size: 3rem; color: #cbd5e1;"></i></div>
+                    <h4 class="fw-bold text-dark mt-2">No Prescriptions Found</h4>
+                    <p class="text-secondary small mb-4">
+                        ${search ? 'No prescription records match your search criteria. Try a different query or clear the filter.' : 'No prescriptions have been finalized yet. Visit the Prescription Desk to create one.'}
+                    </p>
+                    ${search ? `<button type="button" class="btn btn-teal px-4 fw-semibold" id="clearFiltersBtn"><i class="bi bi-arrow-left"></i> Clear Filter</button>` : `
+                    <a href="<?php echo base_url('doctor/prescription-desk'); ?>" class="btn btn-teal px-4 fw-semibold"><i class="bi bi-plus-lg"></i> Go to Prescription Desk</a>`}
+                </div>
+            `;
+            if (historyListContainer) {
+                historyListContainer.innerHTML = emptyHtml;
+            }
+            if (paginationWrapper) {
+                paginationWrapper.innerHTML = '';
+            }
+            
+            // Add clear filters click listener
+            const clearBtn = document.getElementById('clearFiltersBtn');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', function() {
+                    form.reset();
+                    currentPage = 1;
+                    fetchHistory();
+                });
+            }
+            return;
+        }
+
+        // Restore list container if it was empty state
+        if (historyListContainer && !historyListContainer.querySelector('.table-responsive')) {
+            historyListContainer.innerHTML = `
+                <!-- Desktop Table View -->
+                <div class="table-responsive d-none d-md-block">
+                    <table class="table table-hover align-middle mb-0 ph-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 15%;">Invoice No.</th>
+                                <th style="width: 15%;">Visit Date</th>
+                                <th style="width: 30%;">Patient Name</th>
+                                <th style="width: 18%;">Contact Number</th>
+                                <th style="width: 12%;" class="text-center"># Medicines</th>
+                                <th style="width: 10%;" class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile Card Stack View -->
+                <div class="d-block d-md-none p-3">
+                    <div class="row g-3" id="historyMobileCards">
+                    </div>
+                </div>
+            `;
+        }
+
+        const tbody = document.getElementById('historyTableBody');
+        const mcards = document.getElementById('historyMobileCards');
+
+        let tableHtml = '';
+        let mobileHtml = '';
+
+        prescriptions.forEach(p => {
+            // Visit Date formatted
+            const vdate = new Date(p.visit_date);
+            const formattedDate = vdate.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            }).replace(/ /g, '-');
+
+            tableHtml += `
+                <tr>
+                    <td class="fw-bold ph-invoice-cell">${escapeHtml(p.invoice_number)}</td>
+                    <td class="text-secondary">${formattedDate}</td>
+                    <td class="fw-semibold">${escapeHtml(p.patient_name)}</td>
+                    <td class="text-secondary">${escapeHtml(p.patient_contact || '—')}</td>
+                    <td class="text-center">
+                        <span class="badge ph-med-badge">${escapeHtml(p.medicine_count)} Med(s)</span>
+                    </td>
+                    <td class="text-end">
+                        <a href="<?php echo base_url('doctor/history/view-invoice/'); ?>${p.id}" class="btn btn-sm btn-outline-teal fw-semibold d-inline-flex align-items-center gap-1 ph-view-btn">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                    </td>
+                </tr>
+            `;
+
+            mobileHtml += `
+                <div class="col-12">
+                    <div class="ph-record-card">
+                        <div class="ph-record-top">
+                            <div class="ph-record-invoice-wrap">
+                                <span class="ph-record-invoice">${escapeHtml(p.invoice_number)}</span>
+                                <span class="ph-record-date">${formattedDate}</span>
+                            </div>
+                            <span class="badge ph-med-badge">${escapeHtml(p.medicine_count)} Med(s)</span>
+                        </div>
+                        <div class="ph-record-body">
+                            <div class="ph-record-patient">${escapeHtml(p.patient_name)}</div>
+                            <div class="ph-record-contact"><i class="bi bi-telephone me-1"></i> ${escapeHtml(p.patient_contact || '—')}</div>
+                        </div>
+                        <a href="<?php echo base_url('doctor/history/view-invoice/'); ?>${p.id}" class="btn btn-teal w-100 fw-semibold py-2 d-flex align-items-center justify-content-center gap-2 rounded-3">
+                            <i class="bi bi-eye"></i> View Prescription
+                        </a>
+                    </div>
+                </div>
+            `;
+        });
+
+        if (tbody) tbody.innerHTML = tableHtml;
+        if (mcards) mcards.innerHTML = mobileHtml;
+
+        // Render pagination controls
+        if (paginationWrapper) {
+            if (totalPages > 1) {
+                let pagHtml = `<ul class="pagination pagination-sm justify-content-center m-0">`;
+                
+                // First page link
+                pagHtml += `<li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="#" data-page="1" style="color: #0f766e; border-color: #e2e8f0;">First</a></li>`;
+                // Previous link
+                pagHtml += `<li class="page-item ${currentPage <= 1 ? 'disabled' : ''}"><a class="page-link" href="#" data-page="${currentPage - 1}" style="color: #0f766e; border-color: #e2e8f0;"><i class="bi bi-chevron-left"></i></a></li>`;
+
+                let pages = getPaginationPages(currentPage, totalPages);
+                pages.forEach(p => {
+                    if (p === '...') {
+                        pagHtml += `<li class="page-item disabled"><span class="page-link" style="border-color: #e2e8f0;">…</span></li>`;
+                    } else if (p === currentPage) {
+                        pagHtml += `<li class="page-item active"><a class="page-link border-0 text-white" style="background-color: #0f766e;" href="#">${p}</a></li>`;
+                    } else {
+                        pagHtml += `<li class="page-item"><a class="page-link" href="#" data-page="${p}" style="color: #0f766e; border-color: #e2e8f0;">${p}</a></li>`;
+                    }
+                });
+
+                // Next link
+                pagHtml += `<li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="#" data-page="${currentPage + 1}" style="color: #0f766e; border-color: #e2e8f0;"><i class="bi bi-chevron-right"></i></a></li>`;
+                // Last page link
+                pagHtml += `<li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}"><a class="page-link" href="#" data-page="${totalPages}" style="color: #0f766e; border-color: #e2e8f0;">Last</a></li>`;
+
+                pagHtml += `</ul>`;
+                paginationWrapper.innerHTML = pagHtml;
+            } else {
+                paginationWrapper.innerHTML = '';
+            }
+        }
+    }
+
+    function getPaginationPages(currentPage, totalPages) {
+        if (totalPages <= 7) {
+            let pages = [];
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+            return pages;
+        }
+        
+        let pages = [];
+        pages.push(1);
+        
+        let start = Math.max(2, currentPage - 1);
+        let end = Math.min(totalPages - 1, currentPage + 1);
+        
+        if (start > 2) {
+            pages.push('...');
+        }
+        
+        for (let i = start; i <= end; i++) {
+            pages.push(i);
+        }
+        
+        if (end < totalPages - 1) {
+            pages.push('...');
+        }
+        
+        pages.push(totalPages);
+        return pages;
+    }
+
+    function updateStats(stats) {
+        if (!stats) return;
+        
+        // Update stats on the UI
+        const totalPrescVal = document.querySelector('.stat-card.stat-total .stat-value');
+        if (totalPrescVal) totalPrescVal.textContent = parseInt(stats.total_prescriptions).toLocaleString();
+        
+        const todayPrescVal = document.querySelector('.stat-card.stat-active .stat-value');
+        if (todayPrescVal) todayPrescVal.textContent = parseInt(stats.prescriptions_today).toLocaleString();
+        
+        const patientsSeenVal = document.querySelector('.stat-card.stat-inactive .stat-value');
+        if (patientsSeenVal) patientsSeenVal.textContent = parseInt(stats.unique_patients).toLocaleString();
+        
+        const lastVisitVal = document.querySelector('.stat-card.stat-hosp .stat-value');
+        if (lastVisitVal) {
+            if (stats.last_visit && stats.last_visit !== 'N/A') {
+                const ldate = new Date(stats.last_visit);
+                lastVisitVal.textContent = ldate.toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                }).replace(/ /g, '-');
+            } else {
+                lastVisitVal.textContent = 'N/A';
+            }
+        }
+    }
+
     function triggerExcelExport() {
         const form = document.getElementById('historyFilterForm');
         const search = form.querySelector('[name="search"]').value;
@@ -674,4 +912,35 @@
 
         window.location.href = '<?php echo base_url("doctor/history/export"); ?>?' + params.toString();
     }
+
+    if (historyFilterForm) {
+        historyFilterForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            currentPage = 1;
+            fetchHistory();
+        });
+    }
+
+    if (paginationWrapper) {
+        paginationWrapper.addEventListener('click', function(e) {
+            const link = e.target.closest('a');
+            if (!link || !link.dataset.page || link.parentElement.classList.contains('disabled')) return;
+            e.preventDefault();
+            currentPage = parseInt(link.dataset.page);
+            fetchHistory();
+        });
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.toString()
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Load initial history records
+    fetchHistory();
 </script>

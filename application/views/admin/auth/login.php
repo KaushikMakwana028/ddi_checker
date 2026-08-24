@@ -155,9 +155,9 @@
             <i class="bi bi-box-arrow-in-right me-1.5"></i> Sign In
         </button>
         
-        <div class="text-center pt-2 border-top">
+        <!-- <div class="text-center pt-2 border-top">
             <span class="text-muted small">Need an administrative account? <a href="<?php echo base_url('admin/register'); ?>" class="fw-semibold text-decoration-none" style="color: #0d9488;">Register</a></span>
-        </div>
+        </div> -->
     <?php echo form_close(); ?>
 </div>
 

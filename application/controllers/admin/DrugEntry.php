@@ -25,9 +25,61 @@ class DrugEntry extends Admin_Controller {
     public function index() {
         $data['title']      = 'Drug Entry';
         $data['breadcrumb'] = 'Drug Entry';
+
+        // Precompute statistics via database
+        $data['total_drugs']    = $this->General_model->getCount('drugs');
+        $data['active_drugs']   = $this->General_model->getCount('drugs', ['is_active' => 1]);
+        $data['inactive_drugs'] = $this->General_model->getCount('drugs', ['is_active' => 0]);
         
-        // Fetch all drugs
-        $data['drugs'] = $this->General_model->getAll('drugs');
+        $total_stock_query      = $this->db->select_sum('quantity')->get('drugs')->row();
+        $data['total_stock']    = (int)($total_stock_query->quantity ?? 0);
+        $data['out_of_stock']   = $this->General_model->getCount('drugs', ['quantity' => 0]);
+
+        // If AJAX request, return raw data in JSON for client-side JavaScript rendering
+        if ($this->input->is_ajax_request() || $this->input->get('ajax') == 1) {
+            $search = trim($this->input->get('search', TRUE) ?? '');
+            
+            $limit_param = $this->input->get('limit');
+            if ($limit_param === '-1') {
+                $limit = 999999;
+            } else {
+                $limit = (int)$limit_param;
+                if ($limit <= 0) {
+                    $limit = 10; // default
+                }
+            }
+            
+            $page = max(1, (int)$this->input->get('page'));
+            $total_rows = $this->General_model->get_drugs_count($search);
+            $total_pages = max(1, ceil($total_rows / $limit));
+            if ($page > $total_pages && $total_rows > 0) {
+                $page = $total_pages;
+            }
+            $offset = ($page - 1) * $limit;
+
+            $drugs = $this->General_model->get_paginated_drugs($limit, $offset, $search);
+
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status'       => 'success',
+                'drugs'        => $drugs,
+                'total_rows'   => $total_rows,
+                'total_pages'  => $total_pages,
+                'current_page' => $page,
+                'limit'        => $limit,
+                'offset'       => $offset,
+                'stats'        => [
+                    'total_drugs'    => $data['total_drugs'],
+                    'active_drugs'   => $data['active_drugs'],
+                    'inactive_drugs' => $data['inactive_drugs'],
+                    'total_stock'    => $data['total_stock'],
+                    'out_of_stock'   => $data['out_of_stock']
+                ]
+            ]));
+            return;
+        }
+
+        // Initially render with empty array (populated via AJAX)
+        $data['drugs'] = [];
 
         // Render in Admin Layout
         $this->load->view('admin/layout/header', $data);

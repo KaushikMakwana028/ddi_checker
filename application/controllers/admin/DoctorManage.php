@@ -27,16 +27,59 @@ class DoctorManage extends Admin_Controller {
         $data['title']      = 'Doctors';
         $data['breadcrumb'] = 'Doctors';
 
-        // Join users with doctor_profiles where role = 0 (0 = doctor, 1 = admin)
-        $sql = "SELECT u.id, u.name, u.email, u.mobile, u.address, u.is_active, u.created_at,
-                       dp.id AS profile_id, dp.specialization, dp.qualification, dp.hospital_clinic,
-                       dp.registration_number, dp.medical_council, dp.years_experience, dp.added_by_admin_id
-                FROM users u
-                LEFT JOIN doctor_profiles dp ON dp.user_id = u.id
-                WHERE u.role = 0
-                ORDER BY u.id DESC";
+        // Precompute statistics via database queries
+        $data['total_doctors']    = $this->General_model->getCount('users', ['role' => 0]);
+        $data['active_doctors']   = $this->General_model->getCount('users', ['role' => 0, 'is_active' => 1]);
+        $data['inactive_doctors'] = $this->General_model->getCount('users', ['role' => 0, 'is_active' => 0]);
+        
+        $data['unique_specs']     = $this->db->query("SELECT COUNT(DISTINCT LOWER(TRIM(specialization))) as count FROM doctor_profiles WHERE specialization IS NOT NULL AND specialization != ''")->row()->count;
+        $data['unique_hospitals'] = $this->db->query("SELECT COUNT(DISTINCT LOWER(TRIM(hospital_clinic))) as count FROM doctor_profiles WHERE hospital_clinic IS NOT NULL AND hospital_clinic != ''")->row()->count;
 
-        $data['doctors'] = $this->General_model->query($sql);
+        // If AJAX request, return raw data in JSON for client-side JavaScript rendering
+        if ($this->input->is_ajax_request() || $this->input->get('ajax') == 1) {
+            $search = trim($this->input->get('search', TRUE) ?? '');
+            
+            $limit_param = $this->input->get('limit');
+            if ($limit_param === '-1') {
+                $limit = 999999;
+            } else {
+                $limit = (int)$limit_param;
+                if ($limit <= 0) {
+                    $limit = 10; // default
+                }
+            }
+            
+            $page = max(1, (int)$this->input->get('page'));
+            $total_rows = $this->General_model->get_doctors_count($search);
+            $total_pages = max(1, ceil($total_rows / $limit));
+            if ($page > $total_pages && $total_rows > 0) {
+                $page = $total_pages;
+            }
+            $offset = ($page - 1) * $limit;
+
+            $doctors = $this->General_model->get_paginated_doctors($limit, $offset, $search);
+
+            $this->output->set_content_type('application/json')->set_output(json_encode([
+                'status'       => 'success',
+                'doctors'      => $doctors,
+                'total_rows'   => $total_rows,
+                'total_pages'  => $total_pages,
+                'current_page' => $page,
+                'limit'        => $limit,
+                'offset'       => $offset,
+                'stats'        => [
+                    'total_doctors'    => $data['total_doctors'],
+                    'active_doctors'   => $data['active_doctors'],
+                    'inactive_doctors' => $data['inactive_doctors'],
+                    'unique_specs'     => $data['unique_specs'],
+                    'unique_hospitals' => $data['unique_hospitals']
+                ]
+            ]));
+            return;
+        }
+
+        // Initially render with empty array (populated via AJAX)
+        $data['doctors'] = [];
 
         // Load admin layouts and doctors view
         $this->load->view('admin/layout/header', $data);

@@ -877,112 +877,162 @@ foreach ($drugs as $drug) {
         const tableSearchInput = document.getElementById('tableSearchInput');
         const clearSearchBtn = document.getElementById('clearSearchBtn');
 
-        // 1. Client-Side Live Search Filtering & Pagination
+        // 1. Server-Side Live Search Filtering & Pagination
         let currentPage = 1;
+        let isFetching = false;
 
-        if (tableSearchInput) {
-            tableSearchInput.addEventListener('keyup', function() {
-                currentPage = 1;
-                paginateTable();
-            });
-        }
+        function fetchDrugs() {
+            if (isFetching) return;
+            isFetching = true;
 
-        const pageSizeSelect = document.getElementById('pageSizeSelect');
-        if (pageSizeSelect) {
-            pageSizeSelect.addEventListener('change', function() {
-                currentPage = 1;
-                paginateTable();
-            });
-        }
-
-        if (clearSearchBtn) {
-            clearSearchBtn.addEventListener('click', function() {
-                if (tableSearchInput) {
-                    tableSearchInput.value = '';
-                    if (pageSizeSelect) pageSizeSelect.value = '10';
-                    currentPage = 1;
-                    paginateTable();
-                }
-            });
-        }
-
-        function paginateTable() {
-            const query = tableSearchInput ? tableSearchInput.value.toLowerCase().trim() : '';
-            const rows = document.querySelectorAll('#drugsTableBody tr.drug-row');
-
+            const query = tableSearchInput ? tableSearchInput.value.trim() : '';
             const pageSizeSelect = document.getElementById('pageSizeSelect');
-            const selectedLimit = pageSizeSelect ? parseInt(pageSizeSelect.value) : 10;
-            const currentLimit = selectedLimit === -1 ? rows.length : selectedLimit;
+            const limit = pageSizeSelect ? pageSizeSelect.value : 10;
 
-            const matchedRows = [];
-            rows.forEach(row => {
-                const name = row.querySelector('.drug-name-cell') ? row.querySelector('.drug-name-cell').textContent.toLowerCase() : '';
-                const category = row.querySelector('.category-cell') ? row.querySelector('.category-cell').textContent.toLowerCase() : '';
-                const quantity = row.querySelector('.quantity-cell') ? row.querySelector('.quantity-cell').textContent.toLowerCase() : '';
-                const synonyms = row.querySelector('.synonyms-cell') ? row.querySelector('.synonyms-cell').textContent.toLowerCase() : '';
-
-                if (name.includes(query) || category.includes(query) || quantity.includes(query) || synonyms.includes(query)) {
-                    matchedRows.push(row);
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-
-            const totalRows = matchedRows.length;
-            const totalPages = Math.ceil(totalRows / currentLimit);
-
-            if (currentPage < 1) currentPage = 1;
-            if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
-
-            const startIndex = (currentPage - 1) * currentLimit;
-            const endIndex = startIndex + currentLimit;
-
-            matchedRows.forEach((row, idx) => {
-                if (idx >= startIndex && idx < endIndex) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-
-            const existingNoResults = document.getElementById('noResultsRow');
-            if (totalRows === 0 && rows.length > 0) {
-                if (!existingNoResults) {
-                    const noResults = document.createElement('tr');
-                    noResults.id = 'noResultsRow';
-                    noResults.innerHTML = `
+            // Show loading spinner
+            if (drugsTableBody) {
+                drugsTableBody.innerHTML = `
+                    <tr class="loading-row">
                         <td colspan="6" class="text-center py-5 text-muted">
-                            <div class="empty-state">
-                                <i class="bi bi-search"></i>
-                                <h3>No matching drugs</h3>
-                                <p>No registered drugs match: "<strong>${escapeHtml(query)}</strong>"</p>
-                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3 py-1.5" onclick="document.getElementById('clearSearchBtn').click()">Reset Search</button>
+                            <div class="d-flex flex-column align-items-center justify-content-center">
+                                <div class="spinner-border text-teal mb-2" role="status" style="width: 2.5rem; height: 2.5rem; color: #0f766e;"></div>
+                                <span>Loading drugs...</span>
                             </div>
                         </td>
-                    `;
-                    drugsTableBody.appendChild(noResults);
-                } else {
-                    existingNoResults.style.display = '';
-                    existingNoResults.querySelector('p').innerHTML = `No registered drugs match: "<strong>${escapeHtml(query)}</strong>"`;
-                }
-            } else if (existingNoResults) {
-                existingNoResults.style.display = 'none';
+                    </tr>
+                `;
             }
+
+            const url = new URL('<?php echo base_url("admin/drug-entry"); ?>');
+            url.searchParams.append('ajax', '1');
+            url.searchParams.append('page', currentPage);
+            url.searchParams.append('limit', limit);
+            if (query) {
+                url.searchParams.append('search', query);
+            }
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    isFetching = false;
+                    if (data.status === 'success') {
+                        renderTable(data.drugs, data.current_page, data.total_rows, data.limit, data.total_pages);
+                        updateStats(data.stats);
+                    }
+                })
+                .catch(error => {
+                    isFetching = false;
+                    console.error('Error fetching drugs:', error);
+                    if (drugsTableBody) {
+                        drugsTableBody.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-danger">
+                                    <i class="bi bi-exclamation-triangle-fill fs-2"></i>
+                                    <p class="mt-2 mb-0">Failed to load drugs. Please try again.</p>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                });
+        }
+
+        function renderTable(drugs, currentPage, totalRows, limit, totalPages) {
+            if (!drugsTableBody) return;
+            if (!drugs || drugs.length === 0) {
+                const query = tableSearchInput ? tableSearchInput.value.trim() : '';
+                drugsTableBody.innerHTML = `
+                    <tr class="no-drugs-row">
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <div class="empty-state">
+                                <i class="bi bi-folder-x" style="font-size: 3rem; color: #94a3b8 !important;"></i>
+                                <h3 class="fw-bold text-dark mt-2" style="font-size: 1.25rem;">No drugs found</h3>
+                                ${query ? `<p class="text-secondary small">No registered drugs match: "<strong>${escapeHtml(query)}</strong>"</p>
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3 py-1.5 mt-2" onclick="document.getElementById('clearSearchBtn').click()">Reset Search</button>` : `
+                                <p class="text-secondary small">Get started by registering your first clinical drug.</p>
+                                <a href="<?php echo base_url('admin/drug-entry/add'); ?>" class="btn-primary mt-2">
+                                    <i class="bi bi-plus-lg"></i> Add New Drug
+                                </a>`}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                const pagWrap = document.getElementById('paginationWrapper');
+                if (pagWrap) pagWrap.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            drugs.forEach(drug => {
+                const qty = parseInt(drug.quantity || 0);
+                const unit = drug.unit ? escapeHtml(drug.unit) : '';
+                
+                let synonymsHtml = '<span class="text-muted small">—</span>';
+                if (drug.synonyms) {
+                    const syns = drug.synonyms.split(',');
+                    synonymsHtml = '';
+                    syns.forEach(syn => {
+                        const syn_trimmed = syn.trim();
+                        if (syn_trimmed !== '') {
+                            synonymsHtml += `<span class="synonym-chip">${escapeHtml(syn_trimmed)}</span>`;
+                        }
+                    });
+                }
+
+                html += `
+                    <tr class="drug-row" data-id="${drug.id}">
+                        <td class="drug-name-cell">
+                            <span class="drug-chip"><i class="bi bi-capsule"></i>${escapeHtml(drug.drug_name)}</span>
+                        </td>
+                        <td class="category-cell">
+                            ${drug.category ? `<span class="category-badge">${escapeHtml(drug.category)}</span>` : '<span class="text-muted small">—</span>'}
+                        </td>
+                        <td class="quantity-cell">
+                            <span class="stock-badge">
+                                <i class="bi bi-box-seam text-teal"></i>
+                                ${qty.toLocaleString()}${unit !== '' ? ' ' + unit : ''}
+                            </span>
+                        </td>
+                        <td class="synonyms-cell">
+                            ${synonymsHtml}
+                        </td>
+                        <td class="status-cell">
+                            ${parseInt(drug.is_active) === 1 ? '<span class="status-badge status-active"><i class="bi bi-dot"></i>Active</span>' : '<span class="status-badge status-inactive"><i class="bi bi-dot"></i>Inactive</span>'}
+                        </td>
+                        <td class="text-end actions-cell">
+                            <div class="actions-group">
+                                <a href="<?php echo base_url('admin/drug-entry/edit/'); ?>${drug.id}" class="rule-action-btn edit-drug-btn" title="Edit Drug" aria-label="Edit Drug">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                                ${parseInt(drug.is_active) === 1 ? `
+                                    <button type="button" class="rule-action-btn btn-warning-soft deactivate-drug-btn" data-id="${drug.id}" data-name="${escapeHtml(drug.drug_name)}" title="Deactivate Drug" aria-label="Deactivate Drug">
+                                        <i class="bi bi-pause-circle"></i>
+                                    </button>
+                                ` : `
+                                    <button type="button" class="rule-action-btn btn-success-soft activate-drug-btn" data-id="${drug.id}" data-name="${escapeHtml(drug.drug_name)}" title="Activate Drug" aria-label="Activate Drug">
+                                        <i class="bi bi-play-circle"></i>
+                                    </button>
+                                `}
+                                <button type="button" class="rule-action-btn btn-danger-soft delete-drug-btn" data-id="${drug.id}" data-name="${escapeHtml(drug.drug_name)}" title="Delete Drug" aria-label="Delete Drug">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            drugsTableBody.innerHTML = html;
 
             // Render pagination footer inside paginationWrapper
             const pagWrap = document.getElementById('paginationWrapper');
             if (!pagWrap) return;
 
-            if (totalRows === 0) {
-                pagWrap.innerHTML = '';
-                return;
-            }
-
-            const showingTo = Math.min(startIndex + currentLimit, totalRows);
+            const offset = (currentPage - 1) * limit;
+            const showingTo = Math.min(offset + parseInt(limit), totalRows);
             let pagHtml = `
                 <div class="ddi-footer">
                     <div class="footer-count">
-                        Showing <strong>${totalRows > 0 ? startIndex + 1 : 0}</strong>–<strong>${showingTo}</strong> of <strong>${totalRows}</strong> drugs
+                        Showing <strong>${totalRows > 0 ? offset + 1 : 0}</strong>–<strong>${showingTo}</strong> of <strong>${totalRows}</strong> drugs
                     </div>
             `;
 
@@ -990,18 +1040,7 @@ foreach ($drugs as $drug) {
                 pagHtml += `<nav class="ddi-pagination">`;
                 pagHtml += `<a href="#" class="page-nav-btn ${currentPage <= 1 ? 'disabled' : ''}" data-page="${currentPage - 1}"><i class="bi bi-chevron-left"></i></a>`;
 
-                let pages = [];
-                if (totalPages <= 5) {
-                    for (let i = 1; i <= totalPages; i++) pages.push(i);
-                } else {
-                    if (currentPage <= 3) {
-                        pages.push(1, 2, 3, '...', totalPages);
-                    } else if (currentPage >= totalPages - 2) {
-                        pages.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
-                    } else {
-                        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
-                    }
-                }
+                let pages = getPaginationPages(currentPage, totalPages);
 
                 pages.forEach(p => {
                     if (p === '...') {
@@ -1019,6 +1058,84 @@ foreach ($drugs as $drug) {
             pagWrap.innerHTML = pagHtml;
         }
 
+        function getPaginationPages(currentPage, totalPages) {
+            if (totalPages <= 7) {
+                let pages = [];
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+                return pages;
+            }
+            
+            let pages = [];
+            pages.push(1);
+            
+            let start = Math.max(2, currentPage - 1);
+            let end = Math.min(totalPages - 1, currentPage + 1);
+            
+            if (start > 2) {
+                pages.push('...');
+            }
+            
+            for (let i = start; i <= end; i++) {
+                pages.push(i);
+            }
+            
+            if (end < totalPages - 1) {
+                pages.push('...');
+            }
+            
+            pages.push(totalPages);
+            return pages;
+        }
+
+        function updateStats(stats) {
+            if (!stats) return;
+            
+            const totalVal = document.querySelector('.stat-card.stat-total .stat-value');
+            if (totalVal) totalVal.textContent = parseInt(stats.total_drugs).toLocaleString();
+            
+            const activeVal = document.querySelector('.stat-card.stat-active .stat-value');
+            if (activeVal) activeVal.textContent = parseInt(stats.active_drugs).toLocaleString();
+            
+            const inactiveVal = document.querySelector('.stat-card.stat-inactive .stat-value');
+            if (inactiveVal) inactiveVal.textContent = parseInt(stats.inactive_drugs).toLocaleString();
+            
+            const stockVal = document.querySelector('.stat-card.stat-stock .stat-value');
+            if (stockVal) stockVal.textContent = parseInt(stats.total_stock).toLocaleString();
+            
+            const outVal = document.querySelector('.stat-card.stat-out .stat-value');
+            if (outVal) outVal.textContent = parseInt(stats.out_of_stock).toLocaleString();
+        }
+
+        if (tableSearchInput) {
+            let searchTimeout = null;
+            tableSearchInput.addEventListener('keyup', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    currentPage = 1;
+                    fetchDrugs();
+                }, 300);
+            });
+        }
+
+        const pageSizeSelect = document.getElementById('pageSizeSelect');
+        if (pageSizeSelect) {
+            pageSizeSelect.addEventListener('change', function() {
+                currentPage = 1;
+                fetchDrugs();
+            });
+        }
+
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', function() {
+                if (tableSearchInput) {
+                    tableSearchInput.value = '';
+                    if (pageSizeSelect) pageSizeSelect.value = '10';
+                    currentPage = 1;
+                    fetchDrugs();
+                }
+            });
+        }
+
         // Setup page navigation listener
         const paginationWrapper = document.getElementById('paginationWrapper');
         if (paginationWrapper) {
@@ -1027,7 +1144,7 @@ foreach ($drugs as $drug) {
                 if (!btn || btn.classList.contains('disabled') || !btn.dataset.page) return;
                 e.preventDefault();
                 currentPage = parseInt(btn.dataset.page);
-                paginateTable();
+                fetchDrugs();
             });
         }
 
@@ -1168,20 +1285,7 @@ foreach ($drugs as $drug) {
         }
 
         function refreshTable() {
-            fetch('<?php echo base_url("admin/drug-entry"); ?>')
-                .then(response => response.text())
-                .then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    const newTableBody = doc.getElementById('drugsTableBody');
-                    if (newTableBody && drugsTableBody) {
-                        drugsTableBody.innerHTML = newTableBody.innerHTML;
-                        paginateTable();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error reloading drug list:', error);
-                });
+            fetchDrugs();
         }
 
         function updateCsrfTokens(name, hash) {
@@ -1383,6 +1487,6 @@ foreach ($drugs as $drug) {
         }
 
         // Trigger initial pagination
-        paginateTable();
+        fetchDrugs();
     });
 </script>

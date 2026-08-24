@@ -937,16 +937,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 pagHtml += `<a href="#" class="page-nav-btn ${currentPage <= 1 ? 'disabled' : ''}" data-page="${currentPage - 1}"><i class="bi bi-chevron-left"></i></a>`;
                 
                 let pages = [];
-                if (totalPages <= 5) {
+                if (totalPages <= 7) {
                     for (let i = 1; i <= totalPages; i++) pages.push(i);
                 } else {
-                    if (currentPage <= 3) {
-                        pages.push(1, 2, 3, '...', totalPages);
-                    } else if (currentPage >= totalPages - 2) {
-                        pages.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
-                    } else {
-                        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+                    pages.push(1);
+                    let start = Math.max(2, currentPage - 1);
+                    let end = Math.min(totalPages - 1, currentPage + 1);
+                    if (start > 2) {
+                        pages.push('...');
                     }
+                    for (let i = start; i <= end; i++) {
+                        pages.push(i);
+                    }
+                    if (end < totalPages - 1) {
+                        pages.push('...');
+                    }
+                    pages.push(totalPages);
                 }
 
                 pages.forEach(p => {

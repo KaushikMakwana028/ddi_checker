@@ -390,4 +390,139 @@ class General_model extends CI_Model
         
         return $prescriptions;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Paginated Drugs
+    |--------------------------------------------------------------------------
+    */
+    public function get_paginated_drugs($limit, $offset, $search = '')
+    {
+        $this->db->select('*');
+        $this->db->from('drugs');
+
+        if (!empty($search)) {
+            $this->db->group_start();
+            $this->db->like('drug_name', $search);
+            $this->db->or_like('category', $search);
+            $this->db->or_like('synonyms', $search);
+            $this->db->group_end();
+        }
+
+        $this->db->order_by('id', 'DESC');
+        $this->db->limit($limit, $offset);
+
+        return $this->db->get()->result_array();
+    }
+
+    public function get_drugs_count($search = '')
+    {
+        $this->db->from('drugs');
+
+        if (!empty($search)) {
+            $this->db->group_start();
+            $this->db->like('drug_name', $search);
+            $this->db->or_like('category', $search);
+            $this->db->or_like('synonyms', $search);
+            $this->db->group_end();
+        }
+
+        return $this->db->count_all_results();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Paginated Doctors
+    |--------------------------------------------------------------------------
+    */
+    public function get_paginated_doctors($limit, $offset, $search = '')
+    {
+        $this->db->select('u.id, u.name, u.email, u.mobile, u.address, u.is_active, u.created_at,
+                           dp.id AS profile_id, dp.specialization, dp.qualification, dp.hospital_clinic,
+                           dp.registration_number, dp.medical_council, dp.years_experience, dp.added_by_admin_id');
+        $this->db->from('users u');
+        $this->db->join('doctor_profiles dp', 'dp.user_id = u.id', 'left');
+        $this->db->where('u.role', 0);
+
+        if (!empty($search)) {
+            $this->db->group_start();
+            $this->db->like('u.name', $search);
+            $this->db->or_like('u.email', $search);
+            $this->db->or_like('u.mobile', $search);
+            $this->db->or_like('dp.specialization', $search);
+            $this->db->or_like('dp.hospital_clinic', $search);
+            $this->db->or_like('dp.registration_number', $search);
+            $this->db->group_end();
+        }
+
+        $this->db->order_by('u.id', 'DESC');
+        $this->db->limit($limit, $offset);
+
+        return $this->db->get()->result_array();
+    }
+
+    public function get_doctors_count($search = '')
+    {
+        $this->db->from('users u');
+        $this->db->join('doctor_profiles dp', 'dp.user_id = u.id', 'left');
+        $this->db->where('u.role', 0);
+
+        if (!empty($search)) {
+            $this->db->group_start();
+            $this->db->like('u.name', $search);
+            $this->db->or_like('u.email', $search);
+            $this->db->or_like('u.mobile', $search);
+            $this->db->or_like('dp.specialization', $search);
+            $this->db->or_like('dp.hospital_clinic', $search);
+            $this->db->or_like('dp.registration_number', $search);
+            $this->db->group_end();
+        }
+
+        return $this->db->count_all_results();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Paginated Patients
+    |--------------------------------------------------------------------------
+    */
+    public function get_paginated_patients($limit, $offset, $search = '')
+    {
+        $this->db->select('p.*, u.name AS doctor_name, dp.hospital_clinic AS hospital_name');
+        $this->db->from('patients p');
+        $this->db->join('users u', 'u.id = p.doctor_id', 'left');
+        $this->db->join('doctor_profiles dp', 'dp.user_id = p.doctor_id', 'left');
+
+        if (!empty($search)) {
+            $this->db->group_start();
+            $this->db->like('p.full_name', $search);
+            $this->db->or_like('p.contact_number', $search);
+            $this->db->or_like('u.name', $search);
+            $this->db->or_like('dp.hospital_clinic', $search);
+            $this->db->group_end();
+        }
+
+        $this->db->order_by('p.id', 'DESC');
+        $this->db->limit($limit, $offset);
+
+        return $this->db->get()->result_array();
+    }
+
+    public function get_patients_count($search = '')
+    {
+        $this->db->from('patients p');
+        $this->db->join('users u', 'u.id = p.doctor_id', 'left');
+        $this->db->join('doctor_profiles dp', 'dp.user_id = p.doctor_id', 'left');
+
+        if (!empty($search)) {
+            $this->db->group_start();
+            $this->db->like('p.full_name', $search);
+            $this->db->or_like('p.contact_number', $search);
+            $this->db->or_like('u.name', $search);
+            $this->db->or_like('dp.hospital_clinic', $search);
+            $this->db->group_end();
+        }
+
+        return $this->db->count_all_results();
+    }
 }
